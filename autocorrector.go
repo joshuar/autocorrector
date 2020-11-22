@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/getlantern/systray"
@@ -19,15 +18,16 @@ const configName = "autocorrector"
 const configType = "toml"
 
 func main() {
-	log.SetLevel(log.DebugLevel)
+	// log.SetLevel(log.DebugLevel)
 	go systray.Run(systrayOnReady, systrayOnExit)
 	log.Info("Reading config...")
 	config := readConfig()
 	keycode := make(chan rune)
 	space := make(chan bool)
 	control := make(chan bool)
-	go slurpWords(keycode, space, control, &config)
-	snoopKeys(keycode, space, control)
+	backspace := make(chan bool)
+	go slurpWords(keycode, space, control, backspace, &config)
+	snoopKeys(keycode, space, control, backspace)
 }
 
 func readConfig() viper.Viper {
@@ -41,19 +41,20 @@ func readConfig() viper.Viper {
 		log.Fatal(fmt.Errorf("fatal error config file: %s", err))
 	}
 	c.WatchConfig()
-	c.OnConfigChange(func(e fsnotify.Event) {
-		log.Infof("Config file changed:", e.Name)
-	})
 	return *c
 }
 
-func slurpWords(keychar chan rune, space chan bool, control chan bool, replacements *viper.Viper) {
+func slurpWords(keychar chan rune, space chan bool, control chan bool, backspace chan bool, replacements *viper.Viper) {
 	var word []string
 	for {
 		select {
 		// got a regular key, append to create a word
 		case key := <-keychar:
 			word = append(word, string(key))
+		case <-backspace:
+			if len(word) > 0 {
+				word = word[:len(word)-1]
+			}
 		// got the space key, we've got a word, find a replacement
 		case <-space:
 			go checkWord(word, replacements)
@@ -88,13 +89,14 @@ func replaceWord(word string) {
 	robotgo.KeyTap("space")
 }
 
-func snoopKeys(keycode chan rune, space chan bool, control chan bool) {
+func snoopKeys(keycode chan rune, space chan bool, control chan bool, backspace chan bool) {
 
 	nonSpace, _ := regexp.Compile("[[:graph:]]+")
 	evChan := robotgo.EventStart()
 	defer close(evChan)
 	log.Info("Listening for keypresses...")
 	for e := range evChan {
+		log.Debug("Got keypress: ", e.Keychar)
 		// any regular key pressed, slurp that up to form a word
 		if nonSpace.MatchString(string(e.Keychar)) {
 			keycode <- e.Keychar
@@ -106,6 +108,9 @@ func snoopKeys(keycode chan rune, space chan bool, control chan bool) {
 		// enter pressed, clear the current slurping
 		if e.Keychar == 13 {
 			control <- true
+		}
+		if e.Keychar == 8 {
+			backspace <- true
 		}
 	}
 }
