@@ -1,3 +1,5 @@
+# Alpha Software!  Use at own risk!
+
 # Autocorrector
 
 ## What is it?
