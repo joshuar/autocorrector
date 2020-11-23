@@ -17,17 +17,35 @@ import (
 const configName = "autocorrector"
 const configType = "toml"
 
+type keyTracker struct {
+	key       chan rune
+	wordDelim chan bool
+	lineDelim chan bool
+	backspace chan bool
+}
+
+func newKeyTracker() *keyTracker {
+	k := make(chan rune)
+	w := make(chan bool)
+	l := make(chan bool)
+	b := make(chan bool)
+	kt := keyTracker{
+		key:       k,
+		wordDelim: w,
+		lineDelim: l,
+		backspace: b,
+	}
+	return &kt
+}
+
 func main() {
-	// log.SetLevel(log.DebugLevel)
+	//log.SetLevel(log.DebugLevel)
 	go systray.Run(systrayOnReady, systrayOnExit)
 	log.Info("Reading config...")
 	config := readConfig()
-	keycode := make(chan rune)
-	space := make(chan bool)
-	control := make(chan bool)
-	backspace := make(chan bool)
-	go slurpWords(keycode, space, control, backspace, &config)
-	snoopKeys(keycode, space, control, backspace)
+	kt := newKeyTracker()
+	go slurpWords(kt, &config)
+	snoopKeys(kt)
 }
 
 func readConfig() viper.Viper {
@@ -44,23 +62,25 @@ func readConfig() viper.Viper {
 	return *c
 }
 
-func slurpWords(keychar chan rune, space chan bool, control chan bool, backspace chan bool, replacements *viper.Viper) {
+func slurpWords(kt *keyTracker, replacements *viper.Viper) {
 	var word []string
 	for {
 		select {
-		// got a regular key, append to create a word
-		case key := <-keychar:
+		// got a letter or apostrophe key, append to create a word
+		case key := <-kt.key:
 			word = append(word, string(key))
-		case <-backspace:
+		case <-kt.backspace:
 			if len(word) > 0 {
 				word = word[:len(word)-1]
 			}
-		// got the space key, we've got a word, find a replacement
-		case <-space:
-			go checkWord(word, replacements)
+		// got a word delim key, we've got a word, find a replacement
+		case <-kt.wordDelim:
+			delim := word[len(word)-1]
+			word = word[:len(word)-1]
+			go checkWord(word, delim, replacements)
 			word = nil
-		// got the enter key, clear the current word
-		case <-control:
+		// got the line delim key, clear the current word
+		case <-kt.lineDelim:
 			word = nil
 		}
 
@@ -68,13 +88,13 @@ func slurpWords(keychar chan rune, space chan bool, control chan bool, backspace
 
 }
 
-func checkWord(word []string, replacements *viper.Viper) {
+func checkWord(word []string, delim string, replacements *viper.Viper) {
 	wordToCheck := strings.Join(word, "")
 	replacement := replacements.GetString(wordToCheck)
 	if replacement != "" {
 		log.Debug("Found replacement for ", wordToCheck, ": ", replacement)
 		eraseWord(len(word))
-		replaceWord(replacement)
+		replaceWord(replacement, delim)
 	}
 }
 
@@ -84,33 +104,35 @@ func eraseWord(wordLen int) {
 	}
 }
 
-func replaceWord(word string) {
+func replaceWord(word string, delim string) {
 	robotgo.TypeStr(word)
-	robotgo.KeyTap("space")
+	robotgo.KeyTap(delim)
 }
 
-func snoopKeys(keycode chan rune, space chan bool, control chan bool, backspace chan bool) {
-
-	nonSpace, _ := regexp.Compile("[[:graph:]]+")
+func snoopKeys(kt *keyTracker) {
+	wordChar, _ := regexp.Compile("[[:alnum:]']")
+	wordDelim, _ := regexp.Compile("[[:punct:][:blank:]]")
+	lineDelim, _ := regexp.Compile("[\n\r\f]")
 	evChan := robotgo.EventStart()
 	defer close(evChan)
 	log.Info("Listening for keypresses...")
 	for e := range evChan {
-		log.Debug("Got keypress: ", e.Keychar)
+		log.Debug("Got keypress: ", e.Keychar, " : ", string(e.Keychar))
 		// any regular key pressed, slurp that up to form a word
-		if nonSpace.MatchString(string(e.Keychar)) {
-			keycode <- e.Keychar
+		if wordChar.MatchString(string(e.Keychar)) {
+			kt.key <- e.Keychar
 		}
-		// space pressed, triggers replacement lookup
-		if e.Keychar == 32 {
-			space <- true
+		// word delim key pressed, check the word
+		if wordDelim.MatchString(string(e.Keychar)) { //32
+			kt.key <- e.Keychar
+			kt.wordDelim <- true
 		}
-		// enter pressed, clear the current slurping
-		if e.Keychar == 13 {
-			control <- true
+		// line delim key pressed, clear the current slurping
+		if lineDelim.MatchString(string(e.Keychar)) { //13
+			kt.lineDelim <- true
 		}
 		if e.Keychar == 8 {
-			backspace <- true
+			kt.backspace <- true
 		}
 	}
 }
