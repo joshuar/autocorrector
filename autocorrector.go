@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -22,6 +23,35 @@ type keyTracker struct {
 	wordDelim chan bool
 	lineDelim chan bool
 	backspace chan bool
+}
+
+func (kt *keyTracker) snoopKeys() {
+	wordChar, _ := regexp.Compile("[[:alnum:]']")
+	wordDelim, _ := regexp.Compile("[[:punct:][:blank:]]")
+	lineDelim, _ := regexp.Compile("[\n\r\f]")
+	otherControlKey := []int{65360, 65361, 65362, 65363, 65364, 65367, 65365, 65366}
+	kbdEvents := robotgo.EventStart()
+	defer close(kbdEvents)
+
+	log.Info("Listening for keypresses...")
+	for e := range kbdEvents {
+		log.Debug("Got keypress: ", e.Keychar, " : ", string(e.Keychar))
+		switch {
+		case wordChar.MatchString(string(e.Keychar)):
+			kt.key <- e.Keychar
+		case wordDelim.MatchString(string(e.Keychar)):
+			kt.key <- e.Keychar
+			kt.wordDelim <- true
+		case lineDelim.MatchString(string(e.Keychar)):
+			kt.lineDelim <- true
+		case e.Keychar == 8:
+			kt.backspace <- true
+		case sort.SearchInts(otherControlKey, int(e.Rawcode)) > 0:
+			kt.lineDelim <- true
+		default:
+			log.Debugf("Unknown key pressed: %v", e)
+		}
+	}
 }
 
 func newKeyTracker() *keyTracker {
@@ -70,7 +100,7 @@ func main() {
 	config := readConfig()
 	kt := newKeyTracker()
 	go slurpWords(kt, &config)
-	snoopKeys(kt)
+	kt.snoopKeys()
 }
 
 func readConfig() viper.Viper {
@@ -135,34 +165,6 @@ func eraseWord(wordLen int) {
 func replaceWord(word string, delim string) {
 	robotgo.TypeStr(word)
 	robotgo.KeyTap(delim)
-}
-
-func snoopKeys(kt *keyTracker) {
-	wordChar, _ := regexp.Compile("[[:alnum:]']")
-	wordDelim, _ := regexp.Compile("[[:punct:][:blank:]]")
-	lineDelim, _ := regexp.Compile("[\n\r\f]")
-	evChan := robotgo.EventStart()
-	defer close(evChan)
-	log.Info("Listening for keypresses...")
-	for e := range evChan {
-		log.Debug("Got keypress: ", e.Keychar, " : ", string(e.Keychar))
-		// any regular key pressed, slurp that up to form a word
-		if wordChar.MatchString(string(e.Keychar)) {
-			kt.key <- e.Keychar
-		}
-		// word delim key pressed, check the word
-		if wordDelim.MatchString(string(e.Keychar)) { //32
-			kt.key <- e.Keychar
-			kt.wordDelim <- true
-		}
-		// line delim key pressed, clear the current slurping
-		if lineDelim.MatchString(string(e.Keychar)) { //13
-			kt.lineDelim <- true
-		}
-		if e.Keychar == 8 {
-			kt.backspace <- true
-		}
-	}
 }
 
 func systrayOnReady() {
