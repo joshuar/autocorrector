@@ -38,6 +38,31 @@ func newKeyTracker() *keyTracker {
 	return &kt
 }
 
+type wordStats struct {
+	wordsChecked   int
+	wordsCorrected int
+}
+
+func (w *wordStats) addChecked() {
+	w.wordsChecked++
+}
+
+func (w *wordStats) addCorrected() {
+	w.wordsCorrected++
+}
+
+func (w *wordStats) calcAccuracy() float32 {
+	return (1 - float32(w.wordsCorrected)/float32(w.wordsChecked)) * 100
+}
+
+func newWordStats() *wordStats {
+	w := wordStats{
+		wordsChecked:   0,
+		wordsCorrected: 0,
+	}
+	return &w
+}
+
 func main() {
 	//log.SetLevel(log.DebugLevel)
 	go systray.Run(systrayOnReady, systrayOnExit)
@@ -64,6 +89,7 @@ func readConfig() viper.Viper {
 
 func slurpWords(kt *keyTracker, replacements *viper.Viper) {
 	var word []string
+	stats := newWordStats()
 	for {
 		select {
 		// got a letter or apostrophe key, append to create a word
@@ -77,7 +103,7 @@ func slurpWords(kt *keyTracker, replacements *viper.Viper) {
 		case <-kt.wordDelim:
 			delim := word[len(word)-1]
 			word = word[:len(word)-1]
-			go checkWord(word, delim, replacements)
+			go checkWord(word, delim, replacements, stats)
 			word = nil
 		// got the line delim key, clear the current word
 		case <-kt.lineDelim:
@@ -88,11 +114,13 @@ func slurpWords(kt *keyTracker, replacements *viper.Viper) {
 
 }
 
-func checkWord(word []string, delim string, replacements *viper.Viper) {
+func checkWord(word []string, delim string, replacements *viper.Viper, stats *wordStats) {
 	wordToCheck := strings.Join(word, "")
+	stats.addChecked()
 	replacement := replacements.GetString(wordToCheck)
 	if replacement != "" {
 		log.Debug("Found replacement for ", wordToCheck, ": ", replacement)
+		stats.addCorrected()
 		eraseWord(len(word))
 		replaceWord(replacement, delim)
 	}
