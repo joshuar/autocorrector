@@ -133,8 +133,22 @@ func readConfig() viper.Viper {
 	if err != nil {
 		log.Fatal(fmt.Errorf("fatal error config file: %s", err))
 	}
+	checkConfig(c)
 	c.WatchConfig()
 	return *c
+}
+
+func checkConfig(c *viper.Viper) {
+	// check if any value is also a key
+	// in this case, we'd end up with replacing the typo then replacing the replacement
+	configMap := make(map[string]string)
+	c.Unmarshal(&configMap)
+	for _, v := range configMap {
+		found := c.GetString(v)
+		if found != "" {
+			log.Fatalf("A replacement in the config is also listed as a typo (%v)  This won't work.", v)
+		}
+	}
 }
 
 // slurpWords listens for key press events and handles appropriately
