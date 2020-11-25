@@ -138,6 +138,7 @@ func readConfig() viper.Viper {
 	return *c
 }
 
+// checkConfig checks the config for various issues that would cause problems
 func checkConfig(c *viper.Viper) {
 	// check if any value is also a key
 	// in this case, we'd end up with replacing the typo then replacing the replacement
