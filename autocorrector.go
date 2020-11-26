@@ -2,15 +2,12 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/getlantern/systray"
-	"github.com/getlantern/systray/example/icon"
 	"github.com/go-vgo/robotgo"
 	"github.com/spf13/viper"
 )
@@ -114,7 +111,6 @@ func newWordStats() *wordStats {
 
 func main() {
 	//log.SetLevel(log.DebugLevel)
-	go systray.Run(systrayOnReady, systrayOnExit)
 	log.Info("Reading config...")
 	config := readConfig()
 	kt := newKeyTracker()
@@ -204,21 +200,4 @@ func eraseWord(wordLen int) {
 func replaceWord(word string, delim string) {
 	robotgo.TypeStr(word)
 	robotgo.KeyTap(delim)
-}
-
-// systrayOnReady creates a systray for the app
-func systrayOnReady() {
-	systray.SetIcon(icon.Data)
-	systray.SetTitle("Autocorrector")
-	systray.SetTooltip("Autocorrect words you type")
-	mQuit := systray.AddMenuItem("Quit", "Quit the Autocorrector")
-	go func() {
-		<-mQuit.ClickedCh
-		systray.Quit()
-	}()
-}
-
-// systrayOnExit handles clean-up when the tray icon is removed
-func systrayOnExit() {
-	os.Exit(0)
 }

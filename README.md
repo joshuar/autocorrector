@@ -17,7 +17,6 @@ The following Go libraries and tools made autocorrector infinitely easier:
 - [Logrus](https://github.com/sirupsen/logrus):  structured logger for Go (golang), completely API compatible with the standard library logger.
 - [Viper](https://github.com/spf13/viper): Go configuration with fangs!
 - [robotgo](https://github.com/go-vgo/robotgo): Go Native cross-platform GUI system automation. Control the mouse, keyboard and other.
-- [systray](https://github.com/getlantern/systray): Cross platform Go library to place an icon and menu in the notification area.
 
 Check out more awesome Go things at the [Awesome Go List](https://github.com/avelino/awesome-go):
 
