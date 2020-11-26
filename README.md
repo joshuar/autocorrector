@@ -39,5 +39,4 @@ go install
 
 2. Run the `autocorrector` command from `$GOPATH/bin/autocorrector` or use the provided systemd service file to start it with your user systemd instance.
 
-There is a tray icon which has a quit option for ease-of-use.
 
