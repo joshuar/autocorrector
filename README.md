@@ -16,6 +16,7 @@ The following Go libraries and tools made autocorrector infinitely easier:
 
 - [Logrus](https://github.com/sirupsen/logrus):  structured logger for Go (golang), completely API compatible with the standard library logger.
 - [Viper](https://github.com/spf13/viper): Go configuration with fangs!
+- [Cobra](https://github.com/spf13/cobra): A Commander for modern Go CLI interactions.
 - [robotgo](https://github.com/go-vgo/robotgo): Go Native cross-platform GUI system automation. Control the mouse, keyboard and other.
 
 Check out more awesome Go things at the [Awesome Go List](https://github.com/avelino/awesome-go):
@@ -37,6 +38,6 @@ cd $GOPATH/src/github.com/joshuar/autocorrector
 go install
 ```
 
-2. Run the `autocorrector` command from `$GOPATH/bin/autocorrector` or use the provided systemd service file to start it with your user systemd instance.
+2. Run the command with `autocorrector run` from `$GOPATH/bin/autocorrector` or use the provided systemd service file to start it with your user systemd instance.
 
 

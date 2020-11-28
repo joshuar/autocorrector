@@ -1,15 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/joshuar/autocorrector/cmd"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/go-vgo/robotgo"
-	"github.com/spf13/viper"
 )
 
 const configName = "autocorrector"
@@ -110,46 +110,15 @@ func newWordStats() *wordStats {
 }
 
 func main() {
-	//log.SetLevel(log.DebugLevel)
-	log.Info("Reading config...")
-	config := readConfig()
+	cmd.Execute()
 	kt := newKeyTracker()
-	go slurpWords(kt, &config)
+	go slurpWords(kt)
 	kt.snoopKeys()
 }
 
-// readConfig reads the configuration file
-func readConfig() viper.Viper {
-	c := viper.New()
-	c.SetConfigName(configName)
-	c.SetConfigType(configType)
-	c.AddConfigPath("$HOME/.config/autocorrector")
-	c.AddConfigPath(".")
-	err := c.ReadInConfig()
-	if err != nil {
-		log.Fatal(fmt.Errorf("fatal error config file: %s", err))
-	}
-	checkConfig(c)
-	c.WatchConfig()
-	return *c
-}
-
-// checkConfig checks the config for various issues that would cause problems
-func checkConfig(c *viper.Viper) {
-	// check if any value is also a key
-	// in this case, we'd end up with replacing the typo then replacing the replacement
-	configMap := make(map[string]string)
-	c.Unmarshal(&configMap)
-	for _, v := range configMap {
-		found := c.GetString(v)
-		if found != "" {
-			log.Fatalf("A replacement in the config is also listed as a typo (%v)  This won't work.", v)
-		}
-	}
-}
-
 // slurpWords listens for key press events and handles appropriately
-func slurpWords(kt *keyTracker, replacements *viper.Viper) {
+// func slurpWords(kt *keyTracker, replacements *viper.Viper) {
+func slurpWords(kt *keyTracker) {
 	var word []string
 	stats := newWordStats()
 	for {
@@ -165,7 +134,8 @@ func slurpWords(kt *keyTracker, replacements *viper.Viper) {
 		case <-kt.wordDelim:
 			delim := word[len(word)-1]
 			word = word[:len(word)-1]
-			go checkWord(word, delim, replacements, stats)
+			// go checkWord(word, delim, replacements, stats)
+			go checkWord(word, delim, stats)
 			word = nil
 		// got the line delim or navigational key, clear the current word
 		case <-kt.lineDelim:
@@ -177,20 +147,26 @@ func slurpWords(kt *keyTracker, replacements *viper.Viper) {
 }
 
 // checkWord takes a typed word and looks up whether there is a replacement for it
-func checkWord(word []string, delim string, replacements *viper.Viper, stats *wordStats) {
+// func checkWord(word []string, delim string, replacements *viper.Viper, stats *wordStats) {
+func checkWord(word []string, delim string, stats *wordStats) {
 	wordToCheck := strings.Join(word, "")
 	stats.addChecked()
-	replacement := replacements.GetString(wordToCheck)
+	replacement := viper.GetString(wordToCheck)
 	if replacement != "" {
+		// A replacement was found!
 		log.Debug("Found replacement for ", wordToCheck, ": ", replacement)
+		// Update our stats.
 		stats.addCorrected()
+		// Erase the existing word.
 		eraseWord(len(word))
+		// Insert the replacement.
 		replaceWord(replacement, delim)
 	}
 }
 
 // eraseWord removes a typed word
 func eraseWord(wordLen int) {
+	// Effectively, hit backspace key for the length of the word.
 	for i := 0; i <= wordLen; i++ {
 		robotgo.KeyTap("backspace")
 	}
@@ -198,6 +174,7 @@ func eraseWord(wordLen int) {
 
 // replaceWord types the replacement word
 func replaceWord(word string, delim string) {
+	// Type out the replacement and whatever delimiter was after it.
 	robotgo.TypeStr(word)
 	robotgo.KeyTap(delim)
 }
