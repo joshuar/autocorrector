@@ -72,6 +72,7 @@ func initConfig() {
 	// Run checkConfig to ensure config used is safe.
 	checkConfig()
 	log.Debug("Config checks passed")
+	viper.WatchConfig()
 }
 
 // checkConfig runs checks on the provided config to ensure it is safe to use
