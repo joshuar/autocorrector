@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 
+	"github.com/getlantern/systray"
+	"github.com/getlantern/systray/example/icon"
 	"github.com/joshuar/autocorrector/cmd"
 	"github.com/joshuar/autocorrector/internal/keytracker"
 	"github.com/joshuar/autocorrector/internal/wordstats"
@@ -14,10 +16,41 @@ import (
 )
 
 func main() {
+	systray.Run(onReady, onExit)
+}
+
+func onReady() {
 	cmd.Execute()
 	kt := keytracker.NewKeyTracker()
+
+	systray.SetIcon(icon.Data)
+	systray.SetTitle("Autocorrector")
+	systray.SetTooltip("Autocorrector corrects your typos")
+	mQuit := systray.AddMenuItem("Quit", "Quit Autocorrector")
+	mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable Autocorrector", true)
+
 	go slurpWords(kt)
-	kt.SnoopKeys()
+	go kt.SnoopKeys()
+
+	for {
+		select {
+		case <-mEnabled.ClickedCh:
+			if mEnabled.Checked() {
+				mEnabled.Uncheck()
+				log.Info("Disabling Autocorrector")
+			} else {
+				mEnabled.Check()
+				log.Info("Enabling Autocorrector")
+			}
+		case <-mQuit.ClickedCh:
+			log.Info("Requesting quit")
+			systray.Quit()
+		}
+	}
+}
+
+func onExit() {
+	// clean up here
 }
 
 // SlurpWords listens for key press events and handles appropriately

@@ -18,6 +18,7 @@ The following Go libraries and tools made autocorrector infinitely easier:
 - [Viper](https://github.com/spf13/viper): Go configuration with fangs!
 - [Cobra](https://github.com/spf13/cobra): A Commander for modern Go CLI interactions.
 - [robotgo](https://github.com/go-vgo/robotgo): Go Native cross-platform GUI system automation. Control the mouse, keyboard and other.
+- [systray](https://github.com/getlantern/systray): A cross-platform Go library to place an icon and menu in the notification area.
 
 Check out more awesome Go things at the [Awesome Go List](https://github.com/avelino/awesome-go):
 

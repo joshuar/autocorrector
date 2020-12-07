@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/go-vgo/robotgo"
+	hook "github.com/robotn/gohook"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -16,6 +17,8 @@ type KeyTracker struct {
 	WordDelim chan bool
 	LineDelim chan bool
 	Backspace chan bool
+	Disabled  chan bool
+	events    chan hook.Event
 }
 
 // SnoopKeys listens for key presses and fires on the appropriate channel
@@ -30,13 +33,12 @@ func (kt *KeyTracker) SnoopKeys() {
 	// and the arrow keys.
 	otherControlKey := []int{65360, 65361, 65362, 65363, 65364, 65367, 65365, 65366}
 
-	kbdEvents := robotgo.EventStart()
-	defer close(kbdEvents)
+	kt.events = robotgo.EventStart()
 
-	log.Info("Listening for keypresses...")
 	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
 	// depending on what key was pressed, we fire on the appropriate channel to do something about it
-	for e := range kbdEvents {
+	log.Info("Listening for keypresses...")
+	for e := range kt.events {
 		log.Debug("Got keypress: ", e.Keychar, " : ", string(e.Keychar))
 		switch {
 		case wordChar.MatchString(string(e.Keychar)):
@@ -62,11 +64,13 @@ func NewKeyTracker() *KeyTracker {
 	w := make(chan bool)
 	l := make(chan bool)
 	b := make(chan bool)
+	d := make(chan bool)
 	kt := KeyTracker{
 		Key:       k,
 		WordDelim: w,
 		LineDelim: l,
 		Backspace: b,
+		Disabled:  d,
 	}
 	return &kt
 }
