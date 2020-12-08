@@ -21,7 +21,8 @@ func main() {
 
 func onReady() {
 	cmd.Execute()
-	kt := keytracker.NewKeyTracker()
+	keyTracker := keytracker.NewKeyTracker()
+	wordStats := wordstats.NewWordStats()
 
 	systray.SetIcon(icon.Data)
 	systray.SetTitle("Autocorrector")
@@ -29,8 +30,8 @@ func onReady() {
 	mQuit := systray.AddMenuItem("Quit", "Quit Autocorrector")
 	mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable Autocorrector", true)
 
-	go slurpWords(kt)
-	go kt.SnoopKeys()
+	go slurpWords(keyTracker, wordStats)
+	go keyTracker.SnoopKeys()
 
 	for {
 		select {
@@ -38,9 +39,11 @@ func onReady() {
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
 				log.Info("Disabling Autocorrector")
+				keyTracker.Disabled = true
 			} else {
 				mEnabled.Check()
 				log.Info("Enabling Autocorrector")
+				keyTracker.Disabled = false
 			}
 		case <-mQuit.ClickedCh:
 			log.Info("Requesting quit")
@@ -55,9 +58,8 @@ func onExit() {
 
 // SlurpWords listens for key press events and handles appropriately
 // func slurpWords(kt *keyTracker, replacements *viper.Viper) {
-func slurpWords(kt *keytracker.KeyTracker) {
+func slurpWords(kt *keytracker.KeyTracker, st *wordstats.WordStats) {
 	var word []string
-	stats := wordstats.NewWordStats()
 	for {
 		select {
 		// got a letter or apostrophe key, append to create a word
@@ -71,8 +73,7 @@ func slurpWords(kt *keytracker.KeyTracker) {
 		case <-kt.WordDelim:
 			delim := word[len(word)-1]
 			word = word[:len(word)-1]
-			// go checkWord(word, delim, replacements, stats)
-			go checkWord(word, delim, stats)
+			go checkWord(word, delim, st)
 			word = nil
 		// got the line delim or navigational key, clear the current word
 		case <-kt.LineDelim:

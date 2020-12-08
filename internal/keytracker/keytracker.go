@@ -17,7 +17,7 @@ type KeyTracker struct {
 	WordDelim chan bool
 	LineDelim chan bool
 	Backspace chan bool
-	Disabled  chan bool
+	Disabled  bool
 	events    chan hook.Event
 }
 
@@ -37,23 +37,24 @@ func (kt *KeyTracker) SnoopKeys() {
 
 	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
 	// depending on what key was pressed, we fire on the appropriate channel to do something about it
-	log.Info("Listening for keypresses...")
 	for e := range kt.events {
-		log.Debug("Got keypress: ", e.Keychar, " : ", string(e.Keychar))
-		switch {
-		case wordChar.MatchString(string(e.Keychar)):
-			kt.Key <- e.Keychar
-		case wordDelim.MatchString(string(e.Keychar)):
-			kt.Key <- e.Keychar
-			kt.WordDelim <- true
-		case lineDelim.MatchString(string(e.Keychar)):
-			kt.LineDelim <- true
-		case e.Keychar == 8:
-			kt.Backspace <- true
-		case sort.SearchInts(otherControlKey, int(e.Rawcode)) > 0:
-			kt.LineDelim <- true
-		default:
-			log.Debugf("Unknown key pressed: %v", e)
+		if !kt.Disabled {
+			log.Debug("Got keypress: ", e.Keychar, " : ", string(e.Keychar))
+			switch {
+			case wordChar.MatchString(string(e.Keychar)):
+				kt.Key <- e.Keychar
+			case wordDelim.MatchString(string(e.Keychar)):
+				kt.Key <- e.Keychar
+				kt.WordDelim <- true
+			case lineDelim.MatchString(string(e.Keychar)):
+				kt.LineDelim <- true
+			case e.Keychar == 8:
+				kt.Backspace <- true
+			case sort.SearchInts(otherControlKey, int(e.Rawcode)) > 0:
+				kt.LineDelim <- true
+			default:
+				log.Debugf("Unknown key pressed: %v", e)
+			}
 		}
 	}
 }
@@ -64,7 +65,7 @@ func NewKeyTracker() *KeyTracker {
 	w := make(chan bool)
 	l := make(chan bool)
 	b := make(chan bool)
-	d := make(chan bool)
+	d := false
 	kt := KeyTracker{
 		Key:       k,
 		WordDelim: w,
