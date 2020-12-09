@@ -73,7 +73,7 @@ func slurpWords(kt *keytracker.KeyTracker, st *wordstats.WordStats) {
 		case <-kt.WordDelim:
 			delim := word[len(word)-1]
 			word = word[:len(word)-1]
-			go checkWord(word, delim, st)
+			go processWord(word, delim, st)
 			word = nil
 		// got the line delim or navigational key, clear the current word
 		case <-kt.LineDelim:
@@ -86,7 +86,7 @@ func slurpWords(kt *keytracker.KeyTracker, st *wordstats.WordStats) {
 
 // checkWord takes a typed word and looks up whether there is a replacement for it
 // func checkWord(word []string, delim string, replacements *viper.Viper, stats *wordStats) {
-func checkWord(word []string, delim string, stats *wordstats.WordStats) {
+func processWord(word []string, delim string, stats *wordstats.WordStats) {
 	wordToCheck := strings.Join(word, "")
 	stats.AddChecked()
 	replacement := viper.GetString(wordToCheck)
@@ -96,23 +96,13 @@ func checkWord(word []string, delim string, stats *wordstats.WordStats) {
 		// Update our stats.
 		stats.AddCorrected()
 		// Erase the existing word.
-		eraseWord(len(word))
+		// Effectively, hit backspace key for the length of the word.
+		for i := 0; i <= len(word); i++ {
+			robotgo.KeyTap("backspace")
+		}
 		// Insert the replacement.
-		replaceWord(replacement, delim)
+		// Type out the replacement and whatever delimiter was after it.
+		robotgo.TypeStr(replacement)
+		robotgo.KeyTap(delim)
 	}
-}
-
-// eraseWord removes a typed word
-func eraseWord(wordLen int) {
-	// Effectively, hit backspace key for the length of the word.
-	for i := 0; i <= wordLen; i++ {
-		robotgo.KeyTap("backspace")
-	}
-}
-
-// replaceWord types the replacement word
-func replaceWord(word string, delim string) {
-	// Type out the replacement and whatever delimiter was after it.
-	robotgo.TypeStr(word)
-	robotgo.KeyTap(delim)
 }
