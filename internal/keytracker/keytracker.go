@@ -75,3 +75,10 @@ func NewKeyTracker() *KeyTracker {
 	}
 	return &kt
 }
+
+func (k *KeyTracker) CloseKeyTracker() {
+	close(k.Key)
+	close(k.WordDelim)
+	close(k.LineDelim)
+	close(k.Backspace)
+}

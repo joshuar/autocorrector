@@ -15,14 +15,19 @@ import (
 	"github.com/go-vgo/robotgo"
 )
 
+var (
+	keyTracker *keytracker.KeyTracker
+	wordStats  *wordstats.WordStats
+)
+
 func main() {
 	systray.Run(onReady, onExit)
 }
 
 func onReady() {
 	cmd.Execute()
-	keyTracker := keytracker.NewKeyTracker()
-	wordStats := wordstats.NewWordStats()
+	keyTracker = keytracker.NewKeyTracker()
+	wordStats = wordstats.NewWordStats()
 
 	systray.SetIcon(icon.Data)
 	systray.SetTitle("Autocorrector")
@@ -53,7 +58,8 @@ func onReady() {
 }
 
 func onExit() {
-	// clean up here
+	wordStats.CloseWordStats()
+	keyTracker.CloseKeyTracker()
 }
 
 // SlurpWords listens for key press events and handles appropriately

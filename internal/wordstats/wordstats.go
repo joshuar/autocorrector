@@ -45,13 +45,17 @@ func (w *WordStats) AddCorrected(word string, correction string) {
 // 	return (1 - float32(w.wordsCorrected)/float32(w.wordsChecked)) * 100
 // }
 
+// CloseWordStats closes the stats database cleanly
+func (w *WordStats) CloseWordStats() {
+	w.db.Close()
+}
+
 func (wa *wordAction) encode() []byte {
 	encoded, _ := json.Marshal(wa)
 	// if err != nil {
 	// 	return err
 	// }
 	return encoded
-
 }
 
 // NewWordStats creates a new wordStats struct
