@@ -1,6 +1,7 @@
 package wordstats
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -26,24 +27,42 @@ type wordAction struct {
 
 // AddChecked will increment the words checked counter in a wordStats struct
 func (w *WordStats) AddChecked(word string) {
-	checked := newWordAction(word, "checked", "")
-	w.db.Put([]byte(checked.timestamp.String()), []byte(checked.encode()))
-	log.Debugf("Add checked word %v to database", word)
-
+	checkedTotal := w.readAsInt("checkedTotal")
+	w.writeAsInt("checkedTotal", checkedTotal+1)
 }
 
 // AddCorrected will increment the words corrected counter in a wordStats struct
 func (w *WordStats) AddCorrected(word string, correction string) {
+	correctedTotal := w.readAsInt("checkedTotal")
+	w.writeAsInt("correctedTotal", correctedTotal+1)
 	corrected := newWordAction(word, "corrected", correction)
 	w.db.Put([]byte(corrected.timestamp.String()), []byte(corrected.encode()))
 	log.Debugf("Added correction %v for %v to database", correction, word)
 }
 
+func (w *WordStats) readAsInt(key string) uint64 {
+	if w.db.Has([]byte(key)) {
+		valueAsBuf, _ := w.db.Get([]byte(key))
+		valueAsInt, _ := binary.Uvarint(valueAsBuf)
+		return valueAsInt
+	} else {
+		return 0
+	}
+}
+
+func (w *WordStats) writeAsInt(key string, value uint64) {
+	buf := make([]byte, binary.MaxVarintLen64)
+	binary.PutUvarint(buf, value)
+	w.db.Put([]byte(key), buf)
+}
+
 // CalcAccuracy returns the "accuracy" for the current session
 // accuracy is measured as how close to not correcting any words
-// func (w *WordStats) CalcAccuracy() float32 {
-// 	return (1 - float32(w.wordsCorrected)/float32(w.wordsChecked)) * 100
-// }
+func (w *WordStats) CalcAccuracy() float64 {
+	checkedTotal := w.readAsInt("checkedTotal")
+	correctedTotal := w.readAsInt("checkedTotal")
+	return (1 - float64(correctedTotal)/float64(checkedTotal)) * 100
+}
 
 // CloseWordStats closes the stats database cleanly
 func (w *WordStats) CloseWordStats() {
