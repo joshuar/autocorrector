@@ -88,13 +88,13 @@ func slurpWords(kt *keytracker.KeyTracker, st *wordstats.WordStats) {
 // func checkWord(word []string, delim string, replacements *viper.Viper, stats *wordStats) {
 func processWord(word []string, delim string, stats *wordstats.WordStats) {
 	wordToCheck := strings.Join(word, "")
-	stats.AddChecked()
+	stats.AddChecked(wordToCheck)
 	replacement := viper.GetString(wordToCheck)
 	if replacement != "" {
 		// A replacement was found!
 		log.Debug("Found replacement for ", wordToCheck, ": ", replacement)
 		// Update our stats.
-		stats.AddCorrected()
+		stats.AddCorrected(wordToCheck, replacement)
 		// Erase the existing word.
 		// Effectively, hit backspace key for the length of the word.
 		for i := 0; i <= len(word); i++ {

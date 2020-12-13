@@ -35,7 +35,7 @@ func Execute() {
 // init defines flags and configuration settings
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.autocorrector.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/autocorrector/autocorrector.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
 }
 
@@ -45,17 +45,16 @@ func initConfig() {
 		log.SetLevel(log.DebugLevel)
 	}
 
+	home, err := homedir.Dir()
+	if err != nil {
+		log.Fatal(fmt.Errorf("Fatal finding home directory: %s", err))
+	}
+
 	if cfgFile != "" {
 		// Use config file from the flag.
 		log.Debug("Using config file specified on command-line: ", cfgFile)
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Use the default config file location.
-		home, err := homedir.Dir()
-		if err != nil {
-			log.Fatal(fmt.Errorf("Fatal finding home directory: %s", err))
-		}
-
 		var cfgFileDefault = strings.Join([]string{home, "/.config/autocorrector/autocorrector.toml"}, "")
 		viper.SetConfigFile(cfgFileDefault)
 		log.Debug("Using default config file: ", cfgFileDefault)
