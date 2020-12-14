@@ -48,6 +48,7 @@ func initConfig() {
 	home, err := homedir.Dir()
 	if err != nil {
 		log.Fatal(fmt.Errorf("Fatal finding home directory: %s", err))
+		os.Exit(1)
 	}
 
 	if cfgFile != "" {

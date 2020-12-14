@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -33,7 +34,7 @@ func (w *WordStats) AddChecked(word string) {
 
 // AddCorrected will increment the words corrected counter in a wordStats struct
 func (w *WordStats) AddCorrected(word string, correction string) {
-	correctedTotal := w.readAsInt("checkedTotal")
+	correctedTotal := w.readAsInt("correctedTotal")
 	w.writeAsInt("correctedTotal", correctedTotal+1)
 	corrected := newWordAction(word, "corrected", correction)
 	w.db.Put([]byte(corrected.timestamp.String()), []byte(corrected.encode()))
@@ -64,6 +65,14 @@ func (w *WordStats) CalcAccuracy() float64 {
 	return (1 - float64(correctedTotal)/float64(checkedTotal)) * 100
 }
 
+func (w *WordStats) ShowCheckedTotal() uint64 {
+	return w.readAsInt("checkedTotal")
+}
+
+func (w *WordStats) ShowCorrectedTotal() uint64 {
+	return w.readAsInt("correctedTotal")
+}
+
 // CloseWordStats closes the stats database cleanly
 func (w *WordStats) CloseWordStats() {
 	w.db.Close()
@@ -84,7 +93,11 @@ func NewWordStats() *WordStats {
 		log.Fatal(fmt.Errorf("Fatal finding home directory: %s", err))
 	}
 
-	db, _ := bitcask.Open(strings.Join([]string{home, "/.config/autocorrector/stats.db"}, ""))
+	db, err := bitcask.Open(strings.Join([]string{home, "/.config/autocorrector/stats.db"}, ""))
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
 	w := WordStats{
 		db: db,
 	}
