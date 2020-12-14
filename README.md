@@ -19,6 +19,7 @@ The following Go libraries and tools made autocorrector infinitely easier:
 - [Cobra](https://github.com/spf13/cobra): A Commander for modern Go CLI interactions.
 - [robotgo](https://github.com/go-vgo/robotgo): Go Native cross-platform GUI system automation. Control the mouse, keyboard and other.
 - [systray](https://github.com/getlantern/systray): A cross-platform Go library to place an icon and menu in the notification area.
+- [bbolt](https://github.com/etcd-io/bbolt): a pure Go key/value store.
 
 Check out more awesome Go things at the [Awesome Go List](https://github.com/avelino/awesome-go):
 
@@ -39,6 +40,6 @@ cd $GOPATH/src/github.com/joshuar/autocorrector
 go install
 ```
 
-2. Run the command with `autocorrector run` from `$GOPATH/bin/autocorrector` or use the provided systemd service file to start it with your user systemd instance.
+2. Run the command with `autocorrector` from `$GOPATH/bin/autocorrector` or use the provided systemd service file to start it with your user systemd instance.
 
 

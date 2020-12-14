@@ -18,9 +18,9 @@ var statsCmd = &cobra.Command{
 	Short: "Print statistics from the database",
 	Long:  `Show stats such as number of checked/corrected words and accuracy.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		wordStats := wordstats.NewWordStats()
-		log.Infof("%v words checked.", wordStats.ShowCheckedTotal())
-		log.Infof("%v words corrected.", wordStats.ShowCorrectedTotal())
+		wordStats := wordstats.OpenWordStats()
+		log.Infof("%v words checked.", wordStats.GetCheckedTotal())
+		log.Infof("%v words corrected.", wordStats.GetCorrectedTotal())
 		log.Infof("Accuracy is: %.2f %%.", wordStats.CalcAccuracy())
 		wordStats.CloseWordStats()
 		os.Exit(0)

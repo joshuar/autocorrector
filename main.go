@@ -27,7 +27,7 @@ func main() {
 func onReady() {
 	cmd.Execute()
 	keyTracker = keytracker.NewKeyTracker()
-	wordStats = wordstats.NewWordStats()
+	wordStats = wordstats.OpenWordStats()
 
 	systray.SetIcon(icon.Data)
 	systray.SetTitle("Autocorrector")
