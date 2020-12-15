@@ -1,6 +1,9 @@
-# Alpha Software!  Use at own risk!
+
+![Apache 2.0](https://img.shields.io/github/license/joshuar/autocorrector)
 
 # Autocorrector
+
+:warning: **This is alpha software**
 
 ## What is it?
 
