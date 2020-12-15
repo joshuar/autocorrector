@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
 	"github.com/getlantern/systray/example/icon"
 	"github.com/joshuar/autocorrector/cmd"
@@ -33,6 +35,7 @@ func onReady() {
 	systray.SetTitle("Autocorrector")
 	systray.SetTooltip("Autocorrector corrects your typos")
 	mQuit := systray.AddMenuItem("Quit", "Quit Autocorrector")
+	mStats := systray.AddMenuItem("Stats", "Show Stats")
 	mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable Autocorrector", true)
 
 	go slurpWords(keyTracker, wordStats)
@@ -45,14 +48,23 @@ func onReady() {
 				mEnabled.Uncheck()
 				log.Info("Disabling Autocorrector")
 				keyTracker.Disabled = true
+				beeep.Alert("Autocorrector disabled", "", "")
 			} else {
 				mEnabled.Check()
 				log.Info("Enabling Autocorrector")
 				keyTracker.Disabled = false
+				beeep.Alert("Autocorrector enabled", "", "")
+
 			}
 		case <-mQuit.ClickedCh:
 			log.Info("Requesting quit")
 			systray.Quit()
+		case <-mStats.ClickedCh:
+			statsString := fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
+				wordStats.GetCheckedTotal(),
+				wordStats.GetCorrectedTotal(),
+				wordStats.CalcAccuracy())
+			beeep.Alert("Current Stats", statsString, "")
 		}
 	}
 }
