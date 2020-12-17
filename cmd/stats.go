@@ -3,14 +3,17 @@ package cmd
 import (
 	"os"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	"github.com/spf13/cobra"
 )
 
+var (
+	logStatsFlag bool
+)
+
 func init() {
 	rootCmd.AddCommand(statsCmd)
+	statsCmd.Flags().BoolVarP(&logStatsFlag, "log", "l", false, "Show log of corrections")
 }
 
 var statsCmd = &cobra.Command{
@@ -19,9 +22,10 @@ var statsCmd = &cobra.Command{
 	Long:  `Show stats such as number of checked/corrected words and accuracy.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		wordStats := wordstats.OpenWordStats()
-		log.Infof("%v words checked.", wordStats.GetCheckedTotal())
-		log.Infof("%v words corrected.", wordStats.GetCorrectedTotal())
-		log.Infof("Accuracy is: %.2f %%.", wordStats.CalcAccuracy())
+		wordStats.ShowStats()
+		if logStatsFlag {
+			wordStats.ShowLog()
+		}
 		wordStats.CloseWordStats()
 		os.Exit(0)
 	},
