@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/mitchellh/go-homedir"
@@ -45,7 +44,6 @@ func (w *WordStats) AddCorrected(word string, correction string) {
 	corrected := newWordAction(word, "corrected", correction)
 	err := w.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(correctionsBucket))
-		spew.Dump(encode(corrected))
 		err := b.Put([]byte(corrected.Timestamp), encode(corrected))
 		return err
 	})
