@@ -3,8 +3,15 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 
+	"github.com/gen2brain/beeep"
+	"github.com/getlantern/systray"
+	"github.com/getlantern/systray/example/icon"
+	"github.com/joshuar/autocorrector/internal/keytracker"
+	"github.com/joshuar/autocorrector/internal/wordstats"
 	homedir "github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -13,13 +20,47 @@ import (
 )
 
 var (
-	cfgFile   string
-	debugFlag bool
-	rootCmd   = &cobra.Command{
+	keyTracker *keytracker.KeyTracker
+	wordStats  *wordstats.WordStats
+	cfgFile    string
+	debugFlag  bool
+	cpuProfile string
+	memProfile string
+	rootCmd    = &cobra.Command{
 		Use:   "autocorrector run",
 		Short: "Autocorrect typos and spelling mistakes.",
 		Long:  `Autocorrector is a tool similar to the word replacement functionality in Autokey or AutoHotKey.`,
-		Run:   func(cmd *cobra.Command, args []string) {},
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if cpuProfile != "" {
+				log.Infof("Profling CPU to file %s", cpuProfile)
+				f, err := os.Create(cpuProfile)
+				if err != nil {
+					log.Fatal("could not create CPU profile: ", err)
+				}
+				defer f.Close() // error handling omitted for example
+				if err := pprof.StartCPUProfile(f); err != nil {
+					log.Fatal("could not start CPU profile: ", err)
+				}
+				defer pprof.StopCPUProfile()
+			}
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			systray.Run(onReady, onExit)
+		},
+		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+			if memProfile != "" {
+				log.Infof("Profling Mem to file %s", memProfile)
+				f, err := os.Create(memProfile)
+				if err != nil {
+					log.Fatal("could not create memory profile: ", err)
+				}
+				defer f.Close() // error handling omitted for example
+				runtime.GC()    // get up-to-date statistics
+				if err := pprof.WriteHeapProfile(f); err != nil {
+					log.Fatal("could not write memory profile: ", err)
+				}
+			}
+		},
 	}
 )
 
@@ -37,6 +78,8 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/autocorrector/autocorrector.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
+	rootCmd.PersistentFlags().StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
+	rootCmd.PersistentFlags().StringVar(&memProfile, "memprofile", "", "write mem profile to `file`")
 }
 
 // initConfig reads in config file
@@ -87,4 +130,65 @@ func checkConfig() {
 			log.Fatalf("A replacement in the config is also listed as a typo (%v)  This won't work.", v)
 		}
 	}
+}
+
+func onReady() {
+	keyTracker = keytracker.NewKeyTracker()
+	wordStats = wordstats.OpenWordStats()
+
+	systray.SetIcon(icon.Data)
+	systray.SetTitle("Autocorrector")
+	systray.SetTooltip("Autocorrector corrects your typos")
+	mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
+	mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable Autocorrector", true)
+	mStats := systray.AddMenuItem("Stats", "Show current stats")
+	mQuit := systray.AddMenuItem("Quit", "Quit Autocorrector")
+
+	go keyTracker.SlurpWords(wordStats)
+	go keyTracker.SnoopKeys()
+
+	for {
+		select {
+		case <-mEnabled.ClickedCh:
+			if mEnabled.Checked() {
+				mEnabled.Uncheck()
+				keyTracker.Disabled = true
+				log.Info("Disabling Autocorrector")
+				beeep.Notify("Autocorrector disabled", "Temporarily disabling autocorrector", "")
+			} else {
+				mEnabled.Check()
+				keyTracker.Disabled = false
+				log.Info("Enabling Autocorrector")
+				beeep.Notify("Autocorrector enabled", "Re-enabling autocorrector", "")
+
+			}
+		case <-mCorrections.ClickedCh:
+			if mCorrections.Checked() {
+				mCorrections.Uncheck()
+				keyTracker.ShowCorrections = false
+				beeep.Notify("Hiding Corrections", "Hiding notifications for corrections", "")
+			} else {
+				mCorrections.Check()
+				keyTracker.ShowCorrections = true
+				beeep.Notify("Showing Corrections", "Notifications for corrections will be shown as they are made", "")
+
+			}
+		case <-mQuit.ClickedCh:
+			log.Info("Requesting quit")
+			systray.Quit()
+		case <-mStats.ClickedCh:
+			beeep.Notify("Current Stats",
+				fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
+					wordStats.GetCheckedTotal(),
+					wordStats.GetCorrectedTotal(),
+					wordStats.CalcAccuracy()),
+				"")
+		}
+	}
+}
+
+func onExit() {
+	wordStats.CloseWordStats()
+	keyTracker.CloseKeyTracker()
+
 }
