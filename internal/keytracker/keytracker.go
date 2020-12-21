@@ -1,24 +1,30 @@
 package keytracker
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 
+	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
+	"github.com/joshuar/autocorrector/internal/wordstats"
 	hook "github.com/robotn/gohook"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 // KeyTracker holds the channels for handling key presses and
 // indicating when word/line delimiter characters are encountered or
 // backspace is pressed
 type KeyTracker struct {
-	Key       chan rune
-	WordDelim chan bool
-	LineDelim chan bool
-	Backspace chan bool
-	Disabled  bool
-	events    chan hook.Event
+	Key             chan rune
+	WordDelim       chan bool
+	LineDelim       chan bool
+	Backspace       chan bool
+	Disabled        bool
+	ShowCorrections bool
+	events          chan hook.Event
 }
 
 // SnoopKeys listens for key presses and fires on the appropriate channel
@@ -55,6 +61,58 @@ func (kt *KeyTracker) SnoopKeys() {
 			default:
 				log.Debugf("Unknown key pressed: %v", e)
 			}
+		}
+	}
+}
+
+// SlurpWords listens for key press events and handles appropriately
+// func slurpWords(kt *keyTracker, replacements *viper.Viper) {
+func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
+	var word []string
+	for {
+		select {
+		// got a letter or apostrophe key, append to create a word
+		case key := <-kt.Key:
+			word = append(word, string(key))
+		case <-kt.Backspace:
+			if len(word) > 0 {
+				word = word[:len(word)-1]
+			}
+		// got a word delim key, we've got a word, find a replacement
+		case <-kt.WordDelim:
+			delim := word[len(word)-1]
+			word = word[:len(word)-1]
+			go kt.processWord(word, delim, st)
+			word = nil
+		// got the line delim or navigational key, clear the current word
+		case <-kt.LineDelim:
+			word = nil
+		}
+	}
+}
+
+// checkWord takes a typed word and looks up whether there is a replacement for it
+// func checkWord(word []string, delim string, replacements *viper.Viper, stats *wordStats) {
+func (kt *KeyTracker) processWord(word []string, delim string, stats *wordstats.WordStats) {
+	wordToCheck := strings.Join(word, "")
+	stats.AddChecked(wordToCheck)
+	replacement := viper.GetString(wordToCheck)
+	if replacement != "" {
+		// A replacement was found!
+		log.Debug("Found replacement for ", wordToCheck, ": ", replacement)
+		// Update our stats.
+		stats.AddCorrected(wordToCheck, replacement)
+		// Erase the existing word.
+		// Effectively, hit backspace key for the length of the word.
+		for i := 0; i <= len(word); i++ {
+			robotgo.KeyTap("backspace")
+		}
+		// Insert the replacement.
+		// Type out the replacement and whatever delimiter was after it.
+		robotgo.TypeStr(replacement)
+		robotgo.KeyTap(delim)
+		if kt.ShowCorrections {
+			beeep.Alert("Correction!", fmt.Sprintf("Replaced %s with %s", wordToCheck, replacement), "")
 		}
 	}
 }
