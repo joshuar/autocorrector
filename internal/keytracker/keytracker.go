@@ -81,7 +81,7 @@ func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
 		// got a word delim key, we've got a word, find a replacement
 		case <-kt.WordDelim:
 			if len(w.charBuf) > 0 {
-				go kt.processWord(w, st)
+				kt.processWord(w, st)
 			}
 		// got the line delim or navigational key, clear the current word
 		case <-kt.LineDelim:
