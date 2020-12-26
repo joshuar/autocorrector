@@ -68,53 +68,49 @@ func (kt *KeyTracker) SnoopKeys() {
 // SlurpWords listens for key press events and handles appropriately
 // func slurpWords(kt *keyTracker, replacements *viper.Viper) {
 func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
-	var word []string
+	w := newWord()
 	for {
 		select {
 		// got a letter or apostrophe key, append to create a word
 		case key := <-kt.Key:
-			word = append(word, string(key))
+			w.appendBuf(string(key))
 		case <-kt.Backspace:
-			if len(word) > 0 {
-				word = word[:len(word)-1]
+			if len(w.charBuf) > 0 {
+				w.charBuf = w.charBuf[:len(w.charBuf)-1]
 			}
 		// got a word delim key, we've got a word, find a replacement
 		case <-kt.WordDelim:
-			if len(word) > 0 {
-				delim := word[len(word)-1]
-				word = word[:len(word)-1]
-				go kt.processWord(word, delim, st)
+			if len(w.charBuf) > 0 {
+				go kt.processWord(w, st)
 			}
-			word = nil
 		// got the line delim or navigational key, clear the current word
 		case <-kt.LineDelim:
-			word = nil
+			w.clearBuf()
 		}
 	}
 }
 
 // checkWord takes a typed word and looks up whether there is a replacement for it
 // func checkWord(word []string, delim string, replacements *viper.Viper, stats *wordStats) {
-func (kt *KeyTracker) processWord(word []string, delim string, stats *wordstats.WordStats) {
-	wordToCheck := strings.Join(word, "")
-	stats.AddChecked(wordToCheck)
-	replacement := viper.GetString(wordToCheck)
+func (kt *KeyTracker) processWord(word *word, stats *wordstats.WordStats) {
+	word.extract()
+	replacement := viper.GetString(word.asString)
 	if replacement != "" {
 		// A replacement was found!
-		log.Debug("Found replacement for ", wordToCheck, ": ", replacement)
+		log.Debug("Found replacement for ", word.asString, ": ", replacement)
 		// Update our stats.
-		stats.AddCorrected(wordToCheck, replacement)
+		go stats.AddCorrected(word.asString, replacement)
 		// Erase the existing word.
 		// Effectively, hit backspace key for the length of the word.
-		for i := 0; i <= len(word); i++ {
+		for i := 0; i <= word.length; i++ {
 			robotgo.KeyTap("backspace")
 		}
 		// Insert the replacement.
 		// Type out the replacement and whatever delimiter was after it.
 		robotgo.TypeStr(replacement)
-		robotgo.KeyTap(delim)
+		robotgo.KeyTap(word.delim)
 		if kt.ShowCorrections {
-			beeep.Alert("Correction!", fmt.Sprintf("Replaced %s with %s", wordToCheck, replacement), "")
+			beeep.Alert("Correction!", fmt.Sprintf("Replaced %s with %s", word.asString, replacement), "")
 		}
 	}
 }
@@ -141,4 +137,35 @@ func (k *KeyTracker) CloseKeyTracker() {
 	close(k.WordDelim)
 	close(k.LineDelim)
 	close(k.Backspace)
+}
+
+type word struct {
+	charBuf  []string
+	asString string
+	length   int
+	delim    string
+}
+
+func (w *word) clearBuf() {
+	w.charBuf = nil
+}
+
+func (w *word) appendBuf(char string) {
+	w.charBuf = append(w.charBuf, char)
+}
+
+func (w *word) extract() {
+	w.delim = w.charBuf[len(w.charBuf)-1]
+	w.asString = strings.Join(w.charBuf[:len(w.charBuf)-1], "")
+	w.length = len(w.asString)
+	w.clearBuf()
+}
+
+func newWord() *word {
+	return &word{
+		charBuf:  make([]string, 0),
+		asString: "",
+		length:   0,
+		delim:    "",
+	}
 }
