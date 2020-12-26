@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
-	"runtime"
-	"runtime/pprof"
 	"strings"
 
 	"github.com/gen2brain/beeep"
@@ -20,46 +20,38 @@ import (
 )
 
 var (
-	keyTracker *keytracker.KeyTracker
-	wordStats  *wordstats.WordStats
-	cfgFile    string
-	debugFlag  bool
-	cpuProfile string
-	memProfile string
-	rootCmd    = &cobra.Command{
+	keyTracker  *keytracker.KeyTracker
+	wordStats   *wordstats.WordStats
+	cfgFile     string
+	debugFlag   bool
+	cpuProfile  string
+	memProfile  string
+	profileFlag bool
+	rootCmd     = &cobra.Command{
 		Use:   "autocorrector run",
 		Short: "Autocorrect typos and spelling mistakes.",
 		Long:  `Autocorrector is a tool similar to the word replacement functionality in Autokey or AutoHotKey.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if cpuProfile != "" {
-				log.Infof("Profling CPU to file %s", cpuProfile)
-				f, err := os.Create(cpuProfile)
-				if err != nil {
-					log.Fatal("could not create CPU profile: ", err)
-				}
-				defer f.Close() // error handling omitted for example
-				if err := pprof.StartCPUProfile(f); err != nil {
-					log.Fatal("could not start CPU profile: ", err)
-				}
-				defer pprof.StopCPUProfile()
+			if profileFlag {
+				go func() {
+					log.Println(http.ListenAndServe("localhost:6060", nil))
+				}()
 			}
+			// 	if cpuProfile != "" {
+			// 		log.Infof("Profling CPU to file %s", cpuProfile)
+			// 		f, err := os.Create(cpuProfile)
+			// 		if err != nil {
+			// 			log.Fatal("could not create CPU profile: ", err)
+			// 		}
+			// 		defer f.Close() // error handling omitted for example
+			// 		if err := pprof.StartCPUProfile(f); err != nil {
+			// 			log.Fatal("could not start CPU profile: ", err)
+			// 		}
+			// 		defer pprof.StopCPUProfile()
+			// 	}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			systray.Run(onReady, onExit)
-		},
-		PersistentPostRun: func(cmd *cobra.Command, args []string) {
-			if memProfile != "" {
-				log.Infof("Profling Mem to file %s", memProfile)
-				f, err := os.Create(memProfile)
-				if err != nil {
-					log.Fatal("could not create memory profile: ", err)
-				}
-				defer f.Close() // error handling omitted for example
-				runtime.GC()    // get up-to-date statistics
-				if err := pprof.WriteHeapProfile(f); err != nil {
-					log.Fatal("could not write memory profile: ", err)
-				}
-			}
 		},
 	}
 )
@@ -80,6 +72,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
 	rootCmd.PersistentFlags().StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	rootCmd.PersistentFlags().StringVar(&memProfile, "memprofile", "", "write mem profile to `file`")
+	rootCmd.PersistentFlags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
 }
 
 // initConfig reads in config file
@@ -190,5 +183,16 @@ func onReady() {
 func onExit() {
 	wordStats.CloseWordStats()
 	keyTracker.CloseKeyTracker()
-
+	// if memProfile != "" {
+	// 	log.Infof("Profling Mem to file %s", memProfile)
+	// 	f, err := os.Create(memProfile)
+	// 	if err != nil {
+	// 		log.Fatal("could not create memory profile: ", err)
+	// 	}
+	// 	defer f.Close() // error handling omitted for example
+	// 	runtime.GC()    // get up-to-date statistics
+	// 	if err := pprof.WriteHeapProfile(f); err != nil {
+	// 		log.Fatal("could not write memory profile: ", err)
+	// 	}
+	// }
 }

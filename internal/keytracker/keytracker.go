@@ -80,9 +80,11 @@ func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
 			}
 		// got a word delim key, we've got a word, find a replacement
 		case <-kt.WordDelim:
-			delim := word[len(word)-1]
-			word = word[:len(word)-1]
-			go kt.processWord(word, delim, st)
+			if len(word) > 0 {
+				delim := word[len(word)-1]
+				word = word[:len(word)-1]
+				go kt.processWord(word, delim, st)
+			}
 			word = nil
 		// got the line delim or navigational key, clear the current word
 		case <-kt.LineDelim:
