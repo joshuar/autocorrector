@@ -137,8 +137,6 @@ func (w *word) extract() {
 	w.clearBuf()
 }
 
-// checkWord takes a typed word and looks up whether there is a replacement for it
-// func checkWord(word []string, delim string, replacements *viper.Viper, stats *wordStats) {
 func (w *word) processWord(stats *wordstats.WordStats, showCorrections bool) {
 	w.extract()
 	replacement := viper.GetString(w.asString)
