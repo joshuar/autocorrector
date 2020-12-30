@@ -75,15 +75,12 @@ func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
 		// got a letter or apostrophe key, append to create a word
 		case key := <-kt.Key:
 			w.appendBuf(string(key))
+		// got the backspace key, remove last character from the buffer
 		case <-kt.Backspace:
-			if len(w.charBuf) > 0 {
-				w.charBuf = w.charBuf[:len(w.charBuf)-1]
-			}
+			w.removeBuf()
 		// got a word delim key, we've got a word, find a replacement
 		case <-kt.WordDelim:
-			if len(w.charBuf) > 0 {
-				w.processWord(st, kt.ShowCorrections)
-			}
+			w.processWord(st, kt.ShowCorrections)
 		// got the line delim or navigational key, clear the current word
 		case <-kt.LineDelim:
 			w.clearBuf()
@@ -131,6 +128,12 @@ func (w *word) appendBuf(char string) {
 	w.charBuf = append(w.charBuf, char)
 }
 
+func (w *word) removeBuf() {
+	if len(w.charBuf) > 0 {
+		w.charBuf = w.charBuf[:len(w.charBuf)-1]
+	}
+}
+
 func (w *word) extract() {
 	w.delim = w.charBuf[len(w.charBuf)-1]
 	w.asString = strings.Join(w.charBuf[:len(w.charBuf)-1], "")
@@ -139,24 +142,26 @@ func (w *word) extract() {
 }
 
 func (w *word) processWord(stats *wordstats.WordStats, showCorrections bool) {
-	w.extract()
-	replacement := viper.GetString(w.asString)
-	if replacement != "" {
-		// A replacement was found!
-		log.Debug("Found replacement for ", w.asString, ": ", replacement)
-		// Update our stats.
-		go stats.AddCorrected(w.asString, replacement)
-		// Erase the existing word.
-		// Effectively, hit backspace key for the length of the word.
-		for i := 0; i <= w.length; i++ {
-			robotgo.KeyTap("backspace")
-		}
-		// Insert the replacement.
-		// Type out the replacement and whatever delimiter was after it.
-		robotgo.TypeStr(replacement)
-		robotgo.KeyTap(w.delim)
-		if showCorrections {
-			beeep.Alert("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, replacement), "")
+	if len(w.charBuf) > 0 {
+		w.extract()
+		replacement := viper.GetString(w.asString)
+		if replacement != "" {
+			// A replacement was found!
+			log.Debug("Found replacement for ", w.asString, ": ", replacement)
+			// Update our stats.
+			go stats.AddCorrected(w.asString, replacement)
+			// Erase the existing word.
+			// Effectively, hit backspace key for the length of the word.
+			for i := 0; i <= w.length; i++ {
+				robotgo.KeyTap("backspace")
+			}
+			// Insert the replacement.
+			// Type out the replacement and whatever delimiter was after it.
+			robotgo.TypeStr(replacement)
+			robotgo.KeyTap(w.delim)
+			if showCorrections {
+				beeep.Alert("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, replacement), "")
+			}
 		}
 	}
 }
