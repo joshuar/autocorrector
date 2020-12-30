@@ -44,15 +44,16 @@ func (kt *KeyTracker) SnoopKeys() {
 	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
 	// depending on what key was pressed, we fire on the appropriate channel to do something about it
 	for e := range kt.events {
+		keyAsString := string(e.Keychar)
 		if !kt.Disabled {
-			log.Debug("Got keypress: ", e.Keychar, " : ", string(e.Keychar))
+			log.Debug("Got keypress: ", e.Keychar, " : ", keyAsString)
 			switch {
-			case wordChar.MatchString(string(e.Keychar)):
+			case wordChar.MatchString(keyAsString):
 				kt.Key <- e.Keychar
-			case wordDelim.MatchString(string(e.Keychar)):
+			case wordDelim.MatchString(keyAsString):
 				kt.Key <- e.Keychar
 				kt.WordDelim <- true
-			case lineDelim.MatchString(string(e.Keychar)):
+			case lineDelim.MatchString(keyAsString):
 				kt.LineDelim <- true
 			case e.Keychar == 8:
 				kt.Backspace <- true

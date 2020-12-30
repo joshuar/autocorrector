@@ -36,19 +36,8 @@ var (
 				go func() {
 					log.Println(http.ListenAndServe("localhost:6060", nil))
 				}()
+				log.Debug("Profiling is enabled and available at localhost:6060")
 			}
-			// 	if cpuProfile != "" {
-			// 		log.Infof("Profling CPU to file %s", cpuProfile)
-			// 		f, err := os.Create(cpuProfile)
-			// 		if err != nil {
-			// 			log.Fatal("could not create CPU profile: ", err)
-			// 		}
-			// 		defer f.Close() // error handling omitted for example
-			// 		if err := pprof.StartCPUProfile(f); err != nil {
-			// 			log.Fatal("could not start CPU profile: ", err)
-			// 		}
-			// 		defer pprof.StopCPUProfile()
-			// 	}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			systray.Run(onReady, onExit)
@@ -183,16 +172,4 @@ func onReady() {
 func onExit() {
 	wordStats.CloseWordStats()
 	keyTracker.CloseKeyTracker()
-	// if memProfile != "" {
-	// 	log.Infof("Profling Mem to file %s", memProfile)
-	// 	f, err := os.Create(memProfile)
-	// 	if err != nil {
-	// 		log.Fatal("could not create memory profile: ", err)
-	// 	}
-	// 	defer f.Close() // error handling omitted for example
-	// 	runtime.GC()    // get up-to-date statistics
-	// 	if err := pprof.WriteHeapProfile(f); err != nil {
-	// 		log.Fatal("could not write memory profile: ", err)
-	// 	}
-	// }
 }
