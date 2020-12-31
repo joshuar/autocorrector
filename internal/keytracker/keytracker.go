@@ -29,12 +29,6 @@ type KeyTracker struct {
 
 // SnoopKeys listens for key presses and fires on the appropriate channel
 func (kt *KeyTracker) SnoopKeys() {
-	// wordChar represents any standard character that would make up part of a word
-	// wordChar, _ := regexp.Compile("[[:alnum:]']")
-	// wordDelim represents punctauation and space characters that indicate the end of a word
-	// wordDelim, _ := regexp.Compile("[[:punct:][:blank:]]")
-	// lineDeline are linefeed/return characters indicating a new line was started
-	// lineDelim, _ := regexp.Compile("[\n\r\f]")
 	// otherControlKey are the raw keycodes for various navigational keys like home, end, pgup, pgdown
 	// and the arrow keys.
 	otherControlKey := []int{65360, 65361, 65362, 65363, 65364, 65367, 65365, 65366}
@@ -44,21 +38,16 @@ func (kt *KeyTracker) SnoopKeys() {
 	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
 	// depending on what key was pressed, we fire on the appropriate channel to do something about it
 	for e := range kt.events {
-		// keyAsString := string(e.Keychar)
 		if !kt.Disabled {
-			log.Debug("Got keypress: ", e.Keychar, " : ", string(e.Keychar))
 			switch {
 			case e.Keychar == 8:
 				kt.Backspace <- true
 			case unicode.IsDigit(e.Keychar) || unicode.IsLetter(e.Keychar):
-				// case wordChar.MatchString(keyAsString):
 				kt.Key <- e.Keychar
 			case unicode.IsPunct(e.Keychar) || unicode.IsSpace(e.Keychar):
-				// case wordDelim.MatchString(keyAsString):
 				kt.Key <- e.Keychar
 				kt.WordDelim <- true
 			case unicode.IsControl(e.Keychar):
-				// case lineDelim.MatchString(keyAsString):
 				kt.LineDelim <- true
 			case sort.SearchInts(otherControlKey, int(e.Rawcode)) > 0:
 				kt.LineDelim <- true
