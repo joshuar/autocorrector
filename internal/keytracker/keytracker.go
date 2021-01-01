@@ -18,13 +18,13 @@ import (
 // indicating when word/line delimiter characters are encountered or
 // backspace is pressed
 type KeyTracker struct {
-	Key             chan rune
-	WordDelim       chan bool
-	LineDelim       chan bool
-	Backspace       chan bool
+	events          chan hook.Event
+	wordChar        chan rune
+	punctChar       chan bool
+	controlChar     chan bool
+	backspaceChar   chan bool
 	Disabled        bool
 	ShowCorrections bool
-	events          chan hook.Event
 }
 
 // SnoopKeys listens for key presses and fires on the appropriate channel
@@ -33,24 +33,22 @@ func (kt *KeyTracker) SnoopKeys() {
 	// and the arrow keys.
 	otherControlKey := []int{65360, 65361, 65362, 65363, 65364, 65367, 65365, 65366}
 
-	kt.events = robotgo.EventStart()
-
 	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
 	// depending on what key was pressed, we fire on the appropriate channel to do something about it
 	for e := range kt.events {
 		if !kt.Disabled {
 			switch {
 			case e.Keychar == 8:
-				kt.Backspace <- true
+				kt.backspaceChar <- true
 			case unicode.IsDigit(e.Keychar) || unicode.IsLetter(e.Keychar):
-				kt.Key <- e.Keychar
+				kt.wordChar <- e.Keychar
 			case unicode.IsPunct(e.Keychar) || unicode.IsSpace(e.Keychar):
-				kt.Key <- e.Keychar
-				kt.WordDelim <- true
+				kt.wordChar <- e.Keychar
+				kt.punctChar <- true
 			case unicode.IsControl(e.Keychar):
-				kt.LineDelim <- true
+				kt.controlChar <- true
 			case sort.SearchInts(otherControlKey, int(e.Rawcode)) > 0:
-				kt.LineDelim <- true
+				kt.controlChar <- true
 			default:
 				log.Debugf("Unknown key pressed: %v", e)
 			}
@@ -65,16 +63,16 @@ func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
 	for {
 		select {
 		// got a letter or apostrophe key, append to create a word
-		case key := <-kt.Key:
+		case key := <-kt.wordChar:
 			w.appendBuf(string(key))
 		// got the backspace key, remove last character from the buffer
-		case <-kt.Backspace:
+		case <-kt.backspaceChar:
 			w.removeBuf()
 		// got a word delim key, we've got a word, find a replacement
-		case <-kt.WordDelim:
-			w.processWord(st, kt.ShowCorrections)
+		case <-kt.punctChar:
+			w.correctWord(st, kt.ShowCorrections)
 		// got the line delim or navigational key, clear the current word
-		case <-kt.LineDelim:
+		case <-kt.controlChar:
 			w.clearBuf()
 		}
 	}
@@ -82,27 +80,23 @@ func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
 
 // CloseKeyTracker shuts down the channels used for key tracking
 func (kt *KeyTracker) CloseKeyTracker() {
-	close(kt.Key)
-	close(kt.WordDelim)
-	close(kt.LineDelim)
-	close(kt.Backspace)
+	close(kt.wordChar)
+	close(kt.punctChar)
+	close(kt.controlChar)
+	close(kt.backspaceChar)
 }
 
 // NewKeyTracker creates a new keyTracker struct
 func NewKeyTracker() *KeyTracker {
-	k := make(chan rune)
-	w := make(chan bool)
-	l := make(chan bool)
-	b := make(chan bool)
-	d := false
-	kt := KeyTracker{
-		Key:       k,
-		WordDelim: w,
-		LineDelim: l,
-		Backspace: b,
-		Disabled:  d,
+	return &KeyTracker{
+		events:          robotgo.EventStart(),
+		wordChar:        make(chan rune),
+		punctChar:       make(chan bool),
+		controlChar:     make(chan bool),
+		backspaceChar:   make(chan bool),
+		Disabled:        false,
+		ShowCorrections: false,
 	}
-	return &kt
 }
 
 type word struct {
@@ -133,7 +127,7 @@ func (w *word) extract() {
 	w.clearBuf()
 }
 
-func (w *word) processWord(stats *wordstats.WordStats, showCorrections bool) {
+func (w *word) correctWord(stats *wordstats.WordStats, showCorrections bool) {
 	if len(w.charBuf) > 0 {
 		w.extract()
 		replacement := viper.GetString(w.asString)
