@@ -3,6 +3,7 @@ module github.com/joshuar/autocorrector
 go 1.15
 
 require (
+	github.com/cratonica/2goarray v0.0.0-20190331194516-514510793eaa // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/gen2brain/beeep v0.0.0-20200526185328-e9c15c258e28
 	github.com/getlantern/systray v1.1.0

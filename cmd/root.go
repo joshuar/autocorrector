@@ -9,7 +9,7 @@ import (
 
 	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
-	"github.com/getlantern/systray/example/icon"
+	"github.com/joshuar/autocorrector/internal/icon"
 	"github.com/joshuar/autocorrector/internal/keytracker"
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	homedir "github.com/mitchellh/go-homedir"

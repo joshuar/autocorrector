@@ -25,12 +25,13 @@ The following Go libraries and tools made autocorrector infinitely easier:
 - [beeep](https://github.com/gen2brain/beeep): a cross-platform library for sending desktop notifications and beeps.
 - [bbolt](https://github.com/etcd-io/bbolt): a pure Go key/value store.
 
-
 Check out more awesome Go things at the [Awesome Go List](https://github.com/avelino/awesome-go):
 
 The default list of replacements is sourced from the following AutoHotKey script containing common English typos and mispellings:
 
 - https://www.autohotkey.com/download/AutoCorrect.ahk
+
+Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-errors-1292780/).
 
 ## Requirements
 - Golang
