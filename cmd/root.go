@@ -28,7 +28,7 @@ var (
 	memProfile  string
 	profileFlag bool
 	rootCmd     = &cobra.Command{
-		Use:   "autocorrector run",
+		Use:   "autocorrector",
 		Short: "Autocorrect typos and spelling mistakes.",
 		Long:  `Autocorrector is a tool similar to the word replacement functionality in Autokey or AutoHotKey.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
