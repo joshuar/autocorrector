@@ -140,7 +140,7 @@ func (w *word) correctWord(stats *wordstats.WordStats, showCorrections bool) {
 			robotgo.TypeStr(w.correction)
 			robotgo.KeyTap(w.delim)
 			if showCorrections {
-				beeep.Alert("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, w.correction), "")
+				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, w.correction), "")
 			}
 		}
 	}
