@@ -1,9 +1,8 @@
 package keytracker
 
 import (
+	"bytes"
 	"fmt"
-	"sort"
-	"strings"
 	"unicode"
 
 	"github.com/gen2brain/beeep"
@@ -20,7 +19,7 @@ import (
 type KeyTracker struct {
 	events          chan hook.Event
 	wordChar        chan rune
-	punctChar       chan bool
+	punctChar       chan rune
 	controlChar     chan bool
 	backspaceChar   chan bool
 	Disabled        bool
@@ -29,28 +28,21 @@ type KeyTracker struct {
 
 // SnoopKeys listens for key presses and fires on the appropriate channel
 func (kt *KeyTracker) SnoopKeys() {
-	// otherControlKey are the raw keycodes for various navigational keys like home, end, pgup, pgdown
-	// and the arrow keys.
-	otherControlKey := []int{65360, 65361, 65362, 65363, 65364, 65367, 65365, 65366}
 
 	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
 	// depending on what key was pressed, we fire on the appropriate channel to do something about it
 	for e := range kt.events {
 		if !kt.Disabled {
 			switch {
-			case e.Keychar == 8:
+			case e.Keychar == rune('\b'):
 				kt.backspaceChar <- true
 			case unicode.IsDigit(e.Keychar) || unicode.IsLetter(e.Keychar):
 				kt.wordChar <- e.Keychar
 			case unicode.IsPunct(e.Keychar) || unicode.IsSpace(e.Keychar):
-				kt.wordChar <- e.Keychar
-				kt.punctChar <- true
+				kt.punctChar <- e.Keychar
 			case unicode.IsControl(e.Keychar):
 				kt.controlChar <- true
-			case sort.SearchInts(otherControlKey, int(e.Rawcode)) > 0:
-				kt.controlChar <- true
 			default:
-				log.Debugf("Unknown key pressed: %v", e)
 			}
 		}
 	}
@@ -64,12 +56,13 @@ func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
 		select {
 		// got a letter or apostrophe key, append to create a word
 		case key := <-kt.wordChar:
-			w.appendBuf(string(key))
+			w.appendBuf(key)
 		// got the backspace key, remove last character from the buffer
 		case <-kt.backspaceChar:
 			w.removeBuf()
 		// got a word delim key, we've got a word, find a replacement
-		case <-kt.punctChar:
+		case punct := <-kt.punctChar:
+			w.delim = string(punct)
 			w.correctWord(st, kt.ShowCorrections)
 		// got the line delim or navigational key, clear the current word
 		case <-kt.controlChar:
@@ -91,7 +84,7 @@ func NewKeyTracker() *KeyTracker {
 	return &KeyTracker{
 		events:          robotgo.EventStart(),
 		wordChar:        make(chan rune),
-		punctChar:       make(chan bool),
+		punctChar:       make(chan rune),
 		controlChar:     make(chan bool),
 		backspaceChar:   make(chan bool),
 		Disabled:        false,
@@ -100,42 +93,43 @@ func NewKeyTracker() *KeyTracker {
 }
 
 type word struct {
-	charBuf  []string
-	asString string
-	length   int
-	delim    string
+	charBuf    *bytes.Buffer
+	asString   string
+	length     int
+	delim      string
+	correction string
 }
 
 func (w *word) clearBuf() {
-	w.charBuf = nil
+	w.charBuf.Reset()
 }
 
-func (w *word) appendBuf(char string) {
-	w.charBuf = append(w.charBuf, char)
+func (w *word) appendBuf(char rune) {
+	w.charBuf.WriteRune(char)
 }
 
 func (w *word) removeBuf() {
-	if len(w.charBuf) > 0 {
-		w.charBuf = w.charBuf[:len(w.charBuf)-1]
+	if w.charBuf.Len() > 0 {
+		w.charBuf.Truncate(w.charBuf.Len() - 1)
 	}
 }
 
 func (w *word) extract() {
-	w.delim = w.charBuf[len(w.charBuf)-1]
-	w.asString = strings.Join(w.charBuf[:len(w.charBuf)-1], "")
-	w.length = len(w.asString)
+	corrections := newCorrections()
+	w.asString = w.charBuf.String()
+	w.length = w.charBuf.Len()
+	w.correction = corrections.findCorrection(w.asString)
 	w.clearBuf()
 }
 
 func (w *word) correctWord(stats *wordstats.WordStats, showCorrections bool) {
-	if len(w.charBuf) > 0 {
+	if w.charBuf.Len() > 0 {
 		w.extract()
-		replacement := viper.GetString(w.asString)
-		if replacement != "" {
+		if w.correction != "" {
 			// A replacement was found!
-			log.Debug("Found replacement for ", w.asString, ": ", replacement)
+			log.Debug("Found replacement for ", w.asString, ": ", w.correction)
 			// Update our stats.
-			go stats.AddCorrected(w.asString, replacement)
+			go stats.AddCorrected(w.asString, w.correction)
 			// Erase the existing word.
 			// Effectively, hit backspace key for the length of the word.
 			for i := 0; i <= w.length; i++ {
@@ -143,10 +137,10 @@ func (w *word) correctWord(stats *wordstats.WordStats, showCorrections bool) {
 			}
 			// Insert the replacement.
 			// Type out the replacement and whatever delimiter was after it.
-			robotgo.TypeStr(replacement)
+			robotgo.TypeStr(w.correction)
 			robotgo.KeyTap(w.delim)
 			if showCorrections {
-				beeep.Alert("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, replacement), "")
+				beeep.Alert("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, w.correction), "")
 			}
 		}
 	}
@@ -154,9 +148,24 @@ func (w *word) correctWord(stats *wordstats.WordStats, showCorrections bool) {
 
 func newWord() *word {
 	return &word{
-		charBuf:  make([]string, 0),
-		asString: "",
-		length:   0,
-		delim:    "",
+		charBuf:    new(bytes.Buffer),
+		asString:   "",
+		length:     0,
+		delim:      "",
+		correction: "",
 	}
+}
+
+type corrections struct {
+	correctionList map[string]string
+}
+
+func (c *corrections) findCorrection(mispelling string) string {
+	return c.correctionList[mispelling]
+}
+
+func newCorrections() *corrections {
+	c := make(map[string]string)
+	viper.Unmarshal(&c)
+	return &corrections{correctionList: c}
 }

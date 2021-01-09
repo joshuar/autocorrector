@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
 	"github.com/joshuar/autocorrector/internal/icon"
@@ -59,8 +60,6 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/autocorrector/autocorrector.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
-	rootCmd.PersistentFlags().StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
-	rootCmd.PersistentFlags().StringVar(&memProfile, "memprofile", "", "write mem profile to `file`")
 	rootCmd.PersistentFlags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
 }
 
@@ -98,6 +97,10 @@ func initConfig() {
 	checkConfig()
 	log.Debug("Config checks passed")
 	viper.WatchConfig()
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		log.Infof("Config file changed:", e.Name)
+		checkConfig()
+	})
 }
 
 // checkConfig runs checks on the provided config to ensure it is safe to use
