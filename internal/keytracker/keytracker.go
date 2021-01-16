@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"unicode"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
 	"github.com/joshuar/autocorrector/internal/wordstats"
@@ -50,7 +51,8 @@ func (kt *KeyTracker) SnoopKeys() {
 
 // SlurpWords listens for key press events and handles appropriately
 // func slurpWords(kt *keyTracker, replacements *viper.Viper) {
-func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
+func (kt *KeyTracker) SlurpWords(stats *wordstats.WordStats) {
+	corrections := newCorrections()
 	w := newWord()
 	for {
 		select {
@@ -63,7 +65,7 @@ func (kt *KeyTracker) SlurpWords(st *wordstats.WordStats) {
 		// got a word delim key, we've got a word, find a replacement
 		case punct := <-kt.punctChar:
 			w.delim = string(punct)
-			w.correctWord(st, kt.ShowCorrections)
+			w.correctWord(stats, corrections, kt.ShowCorrections)
 		// got the line delim or navigational key, clear the current word
 		case <-kt.controlChar:
 			w.clearBuf()
@@ -114,17 +116,16 @@ func (w *word) removeBuf() {
 	}
 }
 
-func (w *word) extract() {
-	corrections := newCorrections()
+func (w *word) extract(corrections *corrections) {
 	w.asString = w.charBuf.String()
 	w.length = w.charBuf.Len()
 	w.correction = corrections.findCorrection(w.asString)
 	w.clearBuf()
 }
 
-func (w *word) correctWord(stats *wordstats.WordStats, showCorrections bool) {
+func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections, showCorrections bool) {
 	if w.charBuf.Len() > 0 {
-		w.extract()
+		w.extract(corrections)
 		if w.correction != "" {
 			// A replacement was found!
 			log.Debug("Found replacement for ", w.asString, ": ", w.correction)
@@ -157,15 +158,58 @@ func newWord() *word {
 }
 
 type corrections struct {
-	correctionList map[string]string
+	correctionList    map[string]string
+	updateCorrections chan bool
 }
 
 func (c *corrections) findCorrection(mispelling string) string {
 	return c.correctionList[mispelling]
 }
 
+func (c *corrections) checkConfig() {
+	// check if any value is also a key
+	// in this case, we'd end up with replacing the typo then replacing the replacement
+	configMap := make(map[string]string)
+	viper.Unmarshal(&configMap)
+	for _, v := range configMap {
+		found := viper.GetString(v)
+		if found != "" {
+			log.Fatalf("A replacement in the config is also listed as a typo (%v)  This won't work.", v)
+		}
+	}
+	log.Debug("Config looks okay.")
+}
+
+func (c *corrections) monitorConfig() {
+	for {
+		select {
+		case <-c.updateCorrections:
+			c.checkConfig()
+			viper.Unmarshal(&c.correctionList)
+			log.Debug("Updated corrections from config file.")
+		}
+	}
+}
+
 func newCorrections() *corrections {
-	c := make(map[string]string)
-	viper.Unmarshal(&c)
-	return &corrections{correctionList: c}
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
+		} else {
+			log.Fatal(fmt.Errorf("Fatal error config file: %s", err))
+		}
+	}
+	corrections := &corrections{
+		correctionList:    make(map[string]string),
+		updateCorrections: make(chan bool),
+	}
+	corrections.checkConfig()
+	viper.Unmarshal(&corrections.correctionList)
+	go corrections.monitorConfig()
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		log.Debug("Config file has changed.")
+		corrections.updateCorrections <- true
+	})
+	viper.WatchConfig()
+	return corrections
 }

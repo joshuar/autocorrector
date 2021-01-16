@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
 	"github.com/joshuar/autocorrector/internal/icon"
@@ -83,37 +82,6 @@ func initConfig() {
 		var cfgFileDefault = strings.Join([]string{home, "/.config/autocorrector/autocorrector.toml"}, "")
 		viper.SetConfigFile(cfgFileDefault)
 		log.Debug("Using default config file: ", cfgFileDefault)
-	}
-
-	// Read in the config file.
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
-		} else {
-			log.Fatal(fmt.Errorf("Fatal error config file: %s", err))
-		}
-	}
-	// Run checkConfig to ensure config used is safe.
-	checkConfig()
-	log.Debug("Config checks passed")
-	viper.WatchConfig()
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Infof("Config file changed:", e.Name)
-		checkConfig()
-	})
-}
-
-// checkConfig runs checks on the provided config to ensure it is safe to use
-func checkConfig() {
-	// check if any value is also a key
-	// in this case, we'd end up with replacing the typo then replacing the replacement
-	configMap := make(map[string]string)
-	viper.Unmarshal(&configMap)
-	for _, v := range configMap {
-		found := viper.GetString(v)
-		if found != "" {
-			log.Fatalf("A replacement in the config is also listed as a typo (%v)  This won't work.", v)
-		}
 	}
 }
 
