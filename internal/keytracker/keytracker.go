@@ -180,17 +180,6 @@ func (c *corrections) checkConfig() {
 	log.Debug("Config looks okay.")
 }
 
-func (c *corrections) monitorConfig() {
-	for {
-		select {
-		case <-c.updateCorrections:
-			c.checkConfig()
-			viper.Unmarshal(&c.correctionList)
-			log.Debug("Updated corrections from config file.")
-		}
-	}
-}
-
 func newCorrections() *corrections {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -205,7 +194,17 @@ func newCorrections() *corrections {
 	}
 	corrections.checkConfig()
 	viper.Unmarshal(&corrections.correctionList)
-	go corrections.monitorConfig()
+	go func() {
+		for {
+			select {
+			case <-corrections.updateCorrections:
+				corrections.checkConfig()
+				viper.Unmarshal(&corrections.correctionList)
+				log.Debug("Updated corrections from config file.")
+			}
+		}
+
+	}()
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		log.Debug("Config file has changed.")
 		corrections.updateCorrections <- true
