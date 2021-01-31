@@ -143,6 +143,8 @@ func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections,
 			if showCorrections {
 				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, w.correction), "")
 			}
+		} else {
+			go stats.AddChecked(w.asString)
 		}
 	}
 }
