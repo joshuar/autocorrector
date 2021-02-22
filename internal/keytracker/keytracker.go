@@ -13,8 +13,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-//!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
-
 var (
 	letters     = [...]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
 	numbers     = [...]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
@@ -86,24 +84,6 @@ func (kt *KeyTracker) SnoopKeys() {
 	}()
 
 	kt.EventFlow <- true
-
-	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
-	// depending on what key was pressed, we fire on the appropriate channel to do something about it
-	// for e := range kt.events {
-	// 	if !kt.Disabled {
-	// 		switch {
-	// 		case e.Keychar == rune('\b'):
-	// 			kt.backspaceChar <- true
-	// 		case unicode.IsDigit(e.Keychar) || unicode.IsLetter(e.Keychar):
-	// 			kt.wordChar <- e.Keychar
-	// 		case unicode.IsPunct(e.Keychar) || unicode.IsSpace(e.Keychar):
-	// 			kt.punctChar <- e.Keychar
-	// 		case unicode.IsControl(e.Keychar):
-	// 			kt.controlChar <- true
-	// 		default:
-	// 		}
-	// 	}
-	// }
 }
 
 // SlurpWords listens for key press events and handles appropriately
