@@ -3,7 +3,6 @@ package keytracker
 import (
 	"bytes"
 	"fmt"
-	"unicode"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
@@ -12,6 +11,15 @@ import (
 	hook "github.com/robotn/gohook"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+)
+
+//!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+
+var (
+	letters     = [...]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
+	numbers     = [...]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
+	punctuation = [...]string{"-", "+", ",", ".", "/", "\\", "[", "]", "`", ";", "'", "space"}
+	controls    = [...]string{"tab", "ctrl", "alt", "ralt", "shift", "rshift", "enter", "up", "down", "left", "right"}
 )
 
 // KeyTracker holds the channels for handling key presses and
@@ -23,30 +31,79 @@ type KeyTracker struct {
 	punctChar       chan rune
 	controlChar     chan bool
 	backspaceChar   chan bool
-	Disabled        bool
+	EventFlow       chan bool
 	ShowCorrections bool
 }
 
 // SnoopKeys listens for key presses and fires on the appropriate channel
 func (kt *KeyTracker) SnoopKeys() {
 
-	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
-	// depending on what key was pressed, we fire on the appropriate channel to do something about it
-	for e := range kt.events {
-		if !kt.Disabled {
-			switch {
-			case e.Keychar == rune('\b'):
-				kt.backspaceChar <- true
-			case unicode.IsDigit(e.Keychar) || unicode.IsLetter(e.Keychar):
-				kt.wordChar <- e.Keychar
-			case unicode.IsPunct(e.Keychar) || unicode.IsSpace(e.Keychar):
-				kt.punctChar <- e.Keychar
-			case unicode.IsControl(e.Keychar):
-				kt.controlChar <- true
-			default:
+	// listen for letters and pass them to the wordChar channel
+	for i := 0; i < len(letters); i++ {
+		robotgo.EventHook(hook.KeyDown, []string{letters[i]}, func(e hook.Event) {
+			kt.wordChar <- e.Keychar
+		})
+	}
+	// listen for numbers and pass them to the wordChar channel
+	for i := 0; i < len(numbers); i++ {
+		robotgo.EventHook(hook.KeyDown, []string{numbers[i]}, func(e hook.Event) {
+			kt.wordChar <- e.Keychar
+		})
+	}
+	// listen for punctuation and pass them to the punctChar channel
+	for i := 0; i < len(punctuation); i++ {
+		robotgo.EventHook(hook.KeyDown, []string{punctuation[i]}, func(e hook.Event) {
+			kt.punctChar <- e.Keychar
+		})
+	}
+	// listen for punctuation and pass them to the punctChar channel
+	for i := 0; i < len(controls); i++ {
+		robotgo.EventHook(hook.KeyDown, []string{controls[i]}, func(e hook.Event) {
+			kt.controlChar <- true
+		})
+	}
+	// listen for backspace/delete and handle that
+	robotgo.EventHook(hook.KeyDown, []string{"delete"}, func(e hook.Event) {
+		kt.backspaceChar <- true
+	})
+
+	go func() {
+		for {
+			select {
+			case ev := <-kt.EventFlow:
+				if ev {
+					log.Debug("Starting event tracking...")
+					kt.events = robotgo.EventStart()
+					go func() {
+						<-robotgo.EventProcess(kt.events)
+					}()
+				} else {
+					log.Debug("Stopping event tracking...")
+					robotgo.StopEvent()
+				}
 			}
 		}
-	}
+	}()
+
+	kt.EventFlow <- true
+
+	// here we listen for key presses and match the key pressed against the regex patterns or raw keycodes above
+	// depending on what key was pressed, we fire on the appropriate channel to do something about it
+	// for e := range kt.events {
+	// 	if !kt.Disabled {
+	// 		switch {
+	// 		case e.Keychar == rune('\b'):
+	// 			kt.backspaceChar <- true
+	// 		case unicode.IsDigit(e.Keychar) || unicode.IsLetter(e.Keychar):
+	// 			kt.wordChar <- e.Keychar
+	// 		case unicode.IsPunct(e.Keychar) || unicode.IsSpace(e.Keychar):
+	// 			kt.punctChar <- e.Keychar
+	// 		case unicode.IsControl(e.Keychar):
+	// 			kt.controlChar <- true
+	// 		default:
+	// 		}
+	// 	}
+	// }
 }
 
 // SlurpWords listens for key press events and handles appropriately
@@ -84,12 +141,12 @@ func (kt *KeyTracker) CloseKeyTracker() {
 // NewKeyTracker creates a new keyTracker struct
 func NewKeyTracker() *KeyTracker {
 	return &KeyTracker{
-		events:          robotgo.EventStart(),
+		events:          make(chan hook.Event),
 		wordChar:        make(chan rune),
 		punctChar:       make(chan rune),
 		controlChar:     make(chan bool),
 		backspaceChar:   make(chan bool),
-		Disabled:        false,
+		EventFlow:       make(chan bool),
 		ShowCorrections: false,
 	}
 }

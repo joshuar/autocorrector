@@ -105,12 +105,12 @@ func onReady() {
 		case <-mEnabled.ClickedCh:
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
-				keyTracker.Disabled = true
+				keyTracker.EventFlow <- false
 				log.Info("Disabling Autocorrector")
 				beeep.Notify("Autocorrector disabled", "Temporarily disabling autocorrector", "")
 			} else {
 				mEnabled.Check()
-				keyTracker.Disabled = false
+				keyTracker.EventFlow <- true
 				log.Info("Enabling Autocorrector")
 				beeep.Notify("Autocorrector enabled", "Re-enabling autocorrector", "")
 
