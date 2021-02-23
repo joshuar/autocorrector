@@ -35,7 +35,26 @@ type KeyTracker struct {
 
 // SnoopKeys listens for key presses and fires on the appropriate channel
 func (kt *KeyTracker) SnoopKeys() {
+	for {
+		select {
+		case ev := <-kt.EventFlow:
+			if ev {
+				log.Debug("Starting event tracking...")
+				kt.setupSnooping()
+				kt.events = robotgo.EventStart()
+				go func() {
+					<-robotgo.EventProcess(kt.events)
+				}()
+			} else {
+				log.Debug("Stopping event tracking...")
+				robotgo.EventEnd()
+			}
+		default:
+		}
+	}
+}
 
+func (kt *KeyTracker) setupSnooping() {
 	// listen for letters and pass them to the wordChar channel
 	for i := 0; i < len(letters); i++ {
 		robotgo.EventHook(hook.KeyDown, []string{letters[i]}, func(e hook.Event) {
@@ -64,26 +83,6 @@ func (kt *KeyTracker) SnoopKeys() {
 	robotgo.EventHook(hook.KeyDown, []string{"delete"}, func(e hook.Event) {
 		kt.backspaceChar <- true
 	})
-
-	go func() {
-		for {
-			select {
-			case ev := <-kt.EventFlow:
-				if ev {
-					log.Debug("Starting event tracking...")
-					kt.events = robotgo.EventStart()
-					go func() {
-						<-robotgo.EventProcess(kt.events)
-					}()
-				} else {
-					log.Debug("Stopping event tracking...")
-					robotgo.StopEvent()
-				}
-			}
-		}
-	}()
-
-	kt.EventFlow <- true
 }
 
 // SlurpWords listens for key press events and handles appropriately
@@ -102,10 +101,11 @@ func (kt *KeyTracker) SlurpWords(stats *wordstats.WordStats) {
 		// got a word delim key, we've got a word, find a replacement
 		case punct := <-kt.punctChar:
 			w.delim = string(punct)
-			w.correctWord(stats, corrections, kt.ShowCorrections)
+			w.correctWord(stats, corrections, kt.ShowCorrections, kt.EventFlow)
 		// got the line delim or navigational key, clear the current word
 		case <-kt.controlChar:
 			w.clearBuf()
+		default:
 		}
 	}
 }
@@ -160,7 +160,7 @@ func (w *word) extract(corrections *corrections) {
 	w.clearBuf()
 }
 
-func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections, showCorrections bool) {
+func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections, showCorrections bool, eventflow chan bool) {
 	if w.charBuf.Len() > 0 {
 		w.extract(corrections)
 		if w.correction != "" {
@@ -168,15 +168,20 @@ func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections,
 			log.Debug("Found replacement for ", w.asString, ": ", w.correction)
 			// Update our stats.
 			go stats.AddCorrected(w.asString, w.correction)
+			// stop key snooping
+			eventflow <- false
 			// Erase the existing word.
 			// Effectively, hit backspace key for the length of the word.
-			for i := 0; i <= w.length; i++ {
+			log.Debug("Making correction...")
+			for i := 0; i != w.length+1; i++ {
 				robotgo.KeyTap("backspace")
 			}
 			// Insert the replacement.
 			// Type out the replacement and whatever delimiter was after it.
 			robotgo.TypeStr(w.correction)
 			robotgo.KeyTap(w.delim)
+			// restart key snooping
+			eventflow <- true
 			if showCorrections {
 				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, w.correction), "")
 			}

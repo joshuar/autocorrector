@@ -99,6 +99,7 @@ func onReady() {
 
 	go keyTracker.SlurpWords(wordStats)
 	go keyTracker.SnoopKeys()
+	keyTracker.EventFlow <- true
 
 	for {
 		select {
