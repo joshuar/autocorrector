@@ -49,7 +49,6 @@ func (kt *KeyTracker) SnoopKeys() {
 				log.Debug("Stopping event tracking...")
 				robotgo.EventEnd()
 			}
-		default:
 		}
 	}
 }
@@ -105,7 +104,6 @@ func (kt *KeyTracker) SlurpWords(stats *wordstats.WordStats) {
 		// got the line delim or navigational key, clear the current word
 		case <-kt.controlChar:
 			w.clearBuf()
-		default:
 		}
 	}
 }
