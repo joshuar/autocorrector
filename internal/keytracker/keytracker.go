@@ -169,9 +169,9 @@ func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections,
 			// stop key snooping
 			eventflow <- false
 			// Erase the existing word.
-			// Effectively, hit backspace key for the length of the word.
+			// Effectively, hit backspace key for the length of the word plus the punctuation mark.
 			log.Debug("Making correction...")
-			for i := 0; i != w.length+1; i++ {
+			for i := 0; i <= w.length; i++ {
 				robotgo.KeyTap("backspace")
 			}
 			// Insert the replacement.
