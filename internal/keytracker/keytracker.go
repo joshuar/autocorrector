@@ -29,7 +29,8 @@ type KeyTracker struct {
 	punctChar       chan rune
 	controlChar     chan bool
 	backspaceChar   chan bool
-	EventFlow       chan bool
+	StopSnooping    chan int
+	StartSnooping   chan int
 	ShowCorrections bool
 }
 
@@ -37,18 +38,16 @@ type KeyTracker struct {
 func (kt *KeyTracker) SnoopKeys() {
 	for {
 		select {
-		case ev := <-kt.EventFlow:
-			if ev {
-				log.Debug("Starting event tracking...")
-				kt.setupSnooping()
-				kt.events = robotgo.EventStart()
-				go func() {
-					<-robotgo.EventProcess(kt.events)
-				}()
-			} else {
-				log.Debug("Stopping event tracking...")
-				robotgo.EventEnd()
-			}
+		case <-kt.StopSnooping:
+			log.Debug("Stopping event tracking...")
+			robotgo.EventEnd()
+		case <-kt.StartSnooping:
+			log.Debug("Starting event tracking...")
+			kt.events = robotgo.EventStart()
+			kt.setupSnooping()
+			go func() {
+				<-robotgo.EventProcess(kt.events)
+			}()
 		}
 	}
 }
@@ -100,7 +99,7 @@ func (kt *KeyTracker) SlurpWords(stats *wordstats.WordStats) {
 		// got a word delim key, we've got a word, find a replacement
 		case punct := <-kt.punctChar:
 			w.delim = string(punct)
-			w.correctWord(stats, corrections, kt.ShowCorrections, kt.EventFlow)
+			w.correctWord(stats, corrections, kt.ShowCorrections, kt.StartSnooping, kt.StopSnooping)
 		// got the line delim or navigational key, clear the current word
 		case <-kt.controlChar:
 			w.clearBuf()
@@ -124,7 +123,8 @@ func NewKeyTracker() *KeyTracker {
 		punctChar:       make(chan rune),
 		controlChar:     make(chan bool),
 		backspaceChar:   make(chan bool),
-		EventFlow:       make(chan bool),
+		StartSnooping:   make(chan int),
+		StopSnooping:    make(chan int),
 		ShowCorrections: false,
 	}
 }
@@ -158,19 +158,17 @@ func (w *word) extract(corrections *corrections) {
 	w.clearBuf()
 }
 
-func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections, showCorrections bool, eventflow chan bool) {
+func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections, showCorrections bool, startSnooping chan int, stopSnooping chan int) {
 	if w.charBuf.Len() > 0 {
 		w.extract(corrections)
 		if w.correction != "" {
-			// A replacement was found!
-			log.Debug("Found replacement for ", w.asString, ": ", w.correction)
 			// Update our stats.
 			go stats.AddCorrected(w.asString, w.correction)
 			// stop key snooping
-			eventflow <- false
+			stopSnooping <- 0
 			// Erase the existing word.
 			// Effectively, hit backspace key for the length of the word plus the punctuation mark.
-			log.Debug("Making correction...")
+			log.Debugf("Making correction %v -> %v", w.asString, w.correction)
 			for i := 0; i <= w.length; i++ {
 				robotgo.KeyTap("backspace")
 			}
@@ -179,7 +177,7 @@ func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections,
 			robotgo.TypeStr(w.correction)
 			robotgo.KeyTap(w.delim)
 			// restart key snooping
-			eventflow <- true
+			startSnooping <- 0
 			if showCorrections {
 				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, w.correction), "")
 			}
