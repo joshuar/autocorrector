@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
@@ -83,6 +82,7 @@ func (kt *KeyTracker) setupSnooping() {
 		})
 	}
 	// listen for backspace/delete and handle that
+	log.Debug("Adding hook for delete/backspace keys...")
 	robotgo.EventHook(hook.KeyDown, []string{"delete"}, func(e hook.Event) {
 		kt.backspaceChar <- true
 	})
@@ -102,15 +102,12 @@ func (kt *KeyTracker) SlurpWords(stats *wordstats.WordStats) {
 		case <-kt.backspaceChar:
 			log.Debug("removing char")
 			w.removeBuf()
-			spew.Dump(w)
 		// got a word delim key, we've got a word, find a replacement
 		case punct := <-kt.punctChar:
 			w.delim = string(punct)
-			spew.Dump(w)
 			w.correctWord(stats, corrections, kt.ShowCorrections, kt.StartSnooping, kt.StopSnooping)
 		// got the line delim or navigational key, clear the current word
 		case <-kt.controlChar:
-			spew.Dump(w)
 			w.clear()
 		}
 	}
