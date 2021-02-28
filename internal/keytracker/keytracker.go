@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
@@ -17,7 +18,7 @@ var (
 	letters     = [...]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
 	numbers     = [...]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
 	punctuation = [...]string{"-", "+", ",", ".", "/", "\\", "[", "]", "`", ";", "'", "space"}
-	controls    = [...]string{"tab", "ctrl", "alt", "ralt", "shift", "rshift", "enter", "up", "down", "left", "right"}
+	controls    = [...]string{"tab", "ctrl", "alt", "ralt", "shift", "rshift", "cmd", "rcmd", "enter", "up", "down", "left", "right"}
 )
 
 // KeyTracker holds the channels for handling key presses and
@@ -53,25 +54,29 @@ func (kt *KeyTracker) SnoopKeys() {
 }
 
 func (kt *KeyTracker) setupSnooping() {
-	// listen for letters and pass them to the wordChar channel
+	// listen for letter keys and pass them to the wordChar channel
+	log.Debug("Adding hook for letter keys...")
 	for i := 0; i < len(letters); i++ {
 		robotgo.EventHook(hook.KeyDown, []string{letters[i]}, func(e hook.Event) {
 			kt.wordChar <- e.Keychar
 		})
 	}
-	// listen for numbers and pass them to the wordChar channel
+	// listen for number keys and pass them to the wordChar channel
+	log.Debug("Adding hook for number keys...")
 	for i := 0; i < len(numbers); i++ {
 		robotgo.EventHook(hook.KeyDown, []string{numbers[i]}, func(e hook.Event) {
 			kt.wordChar <- e.Keychar
 		})
 	}
-	// listen for punctuation and pass them to the punctChar channel
+	// listen for punctuation keys and pass them to the punctChar channel
+	log.Debug("Adding hook for punctuation keys...")
 	for i := 0; i < len(punctuation); i++ {
 		robotgo.EventHook(hook.KeyDown, []string{punctuation[i]}, func(e hook.Event) {
 			kt.punctChar <- e.Keychar
 		})
 	}
-	// listen for punctuation and pass them to the punctChar channel
+	// listen for control keys and pass them to the punctChar channel
+	log.Debug("Adding hook for control keys...")
 	for i := 0; i < len(controls); i++ {
 		robotgo.EventHook(hook.KeyDown, []string{controls[i]}, func(e hook.Event) {
 			kt.controlChar <- true
@@ -95,14 +100,18 @@ func (kt *KeyTracker) SlurpWords(stats *wordstats.WordStats) {
 			w.appendBuf(key)
 		// got the backspace key, remove last character from the buffer
 		case <-kt.backspaceChar:
+			log.Debug("removing char")
 			w.removeBuf()
+			spew.Dump(w)
 		// got a word delim key, we've got a word, find a replacement
 		case punct := <-kt.punctChar:
 			w.delim = string(punct)
+			spew.Dump(w)
 			w.correctWord(stats, corrections, kt.ShowCorrections, kt.StartSnooping, kt.StopSnooping)
 		// got the line delim or navigational key, clear the current word
 		case <-kt.controlChar:
-			w.clearBuf()
+			spew.Dump(w)
+			w.clear()
 		}
 	}
 }
@@ -131,8 +140,6 @@ func NewKeyTracker() *KeyTracker {
 
 type word struct {
 	charBuf    *bytes.Buffer
-	asString   string
-	length     int
 	delim      string
 	correction string
 }
@@ -152,10 +159,13 @@ func (w *word) removeBuf() {
 }
 
 func (w *word) extract(corrections *corrections) {
-	w.asString = w.charBuf.String()
-	w.length = w.charBuf.Len()
-	w.correction = corrections.findCorrection(w.asString)
+	w.correction = corrections.findCorrection(w.charBuf.String())
+}
+
+func (w *word) clear() {
 	w.clearBuf()
+	w.delim = ""
+	w.correction = ""
 }
 
 func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections, showCorrections bool, startSnooping chan int, stopSnooping chan int) {
@@ -163,13 +173,13 @@ func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections,
 		w.extract(corrections)
 		if w.correction != "" {
 			// Update our stats.
-			go stats.AddCorrected(w.asString, w.correction)
+			go stats.AddCorrected(w.charBuf.String(), w.correction)
 			// stop key snooping
 			stopSnooping <- 0
 			// Erase the existing word.
 			// Effectively, hit backspace key for the length of the word plus the punctuation mark.
-			log.Debugf("Making correction %v -> %v", w.asString, w.correction)
-			for i := 0; i <= w.length; i++ {
+			log.Debugf("Making correction %v -> %v", w.charBuf.String(), w.correction)
+			for i := 0; i <= w.charBuf.Len(); i++ {
 				robotgo.KeyTap("backspace")
 			}
 			// Insert the replacement.
@@ -179,19 +189,18 @@ func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections,
 			// restart key snooping
 			startSnooping <- 0
 			if showCorrections {
-				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", w.asString, w.correction), "")
+				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", w.charBuf.String(), w.correction), "")
 			}
 		} else {
-			go stats.AddChecked(w.asString)
+			go stats.AddChecked(w.charBuf.String())
 		}
+		w.clear()
 	}
 }
 
 func newWord() *word {
 	return &word{
 		charBuf:    new(bytes.Buffer),
-		asString:   "",
-		length:     0,
 		delim:      "",
 		correction: "",
 	}
