@@ -29,8 +29,8 @@ type KeyTracker struct {
 	punctChar       chan rune
 	controlChar     chan bool
 	backspaceChar   chan bool
-	StopSnooping    chan int
-	StartSnooping   chan int
+	StopSnooping    chan bool
+	StartSnooping   chan bool
 	ShowCorrections bool
 }
 
@@ -129,8 +129,8 @@ func NewKeyTracker() *KeyTracker {
 		punctChar:       make(chan rune),
 		controlChar:     make(chan bool),
 		backspaceChar:   make(chan bool),
-		StartSnooping:   make(chan int),
-		StopSnooping:    make(chan int),
+		StartSnooping:   make(chan bool),
+		StopSnooping:    make(chan bool),
 		ShowCorrections: false,
 	}
 }
@@ -165,14 +165,14 @@ func (w *word) clear() {
 	w.correction = ""
 }
 
-func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections, showCorrections bool, startSnooping chan int, stopSnooping chan int) {
+func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections, showCorrections bool, startSnooping chan bool, stopSnooping chan bool) {
 	if w.charBuf.Len() > 0 {
 		w.extract(corrections)
 		if w.correction != "" {
 			// Update our stats.
 			go stats.AddCorrected(w.charBuf.String(), w.correction)
 			// stop key snooping
-			stopSnooping <- 0
+			stopSnooping <- true
 			// Erase the existing word.
 			// Effectively, hit backspace key for the length of the word plus the punctuation mark.
 			log.Debugf("Making correction %v -> %v", w.charBuf.String(), w.correction)
@@ -184,7 +184,7 @@ func (w *word) correctWord(stats *wordstats.WordStats, corrections *corrections,
 			robotgo.TypeStr(w.correction)
 			robotgo.KeyTap(w.delim)
 			// restart key snooping
-			startSnooping <- 0
+			startSnooping <- true
 			if showCorrections {
 				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", w.charBuf.String(), w.correction), "")
 			}

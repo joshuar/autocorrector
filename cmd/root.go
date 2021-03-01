@@ -99,19 +99,19 @@ func onReady() {
 
 	go keyTracker.SlurpWords(wordStats)
 	go keyTracker.SnoopKeys()
-	keyTracker.StartSnooping <- 0
+	keyTracker.StartSnooping <- true
 
 	for {
 		select {
 		case <-mEnabled.ClickedCh:
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
-				keyTracker.StopSnooping <- 0
+				keyTracker.StopSnooping <- true
 				log.Info("Disabling Autocorrector")
 				beeep.Notify("Autocorrector disabled", "Temporarily disabling autocorrector", "")
 			} else {
 				mEnabled.Check()
-				keyTracker.StartSnooping <- 0
+				keyTracker.StartSnooping <- true
 				log.Info("Enabling Autocorrector")
 				beeep.Notify("Autocorrector enabled", "Re-enabling autocorrector", "")
 
