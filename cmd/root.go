@@ -97,7 +97,7 @@ func onReady() {
 	mStats := systray.AddMenuItem("Stats", "Show current stats")
 	mQuit := systray.AddMenuItem("Quit", "Quit Autocorrector")
 
-	go keyTracker.SlurpWords(wordStats)
+	go keyTracker.SlurpWord(wordStats)
 	go keyTracker.SnoopKeys()
 	keyTracker.StartSnooping <- true
 
