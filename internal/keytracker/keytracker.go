@@ -28,6 +28,16 @@ type KeyTracker struct {
 	ShowCorrections bool
 }
 
+func isControl(k uint16) bool {
+	var controlKeycode = []uint16{1, 14, 15, 29, 56, 28, 3675, 3676, 3640, 57416, 57424, 57419, 57421}
+	for i := 0; i < len(controlKeycode); i++ {
+		if controlKeycode[i] == k {
+			return true
+		}
+	}
+	return false
+}
+
 // SnoopKeys listens for key presses and fires on the appropriate channel
 func (kt *KeyTracker) SnoopKeys() {
 	for {
@@ -47,7 +57,7 @@ func (kt *KeyTracker) SnoopKeys() {
 						kt.wordChar <- e.Keychar
 					case unicode.IsPunct(e.Keychar) || unicode.IsSymbol(e.Keychar) || unicode.IsSpace(e.Keychar):
 						kt.punctChar <- e.Keychar
-					case unicode.IsControl(e.Keychar):
+					case isControl(e.Keycode): //unicode.IsControl(e.Keychar):
 						kt.controlChar <- true
 					case unicode.IsPrint(e.Keychar):
 						log.Debugf("Got unhandled printable character: %v", string(e.Keychar))
