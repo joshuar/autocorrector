@@ -17,127 +17,99 @@ import (
 
 type State string
 
-const (
-	start     State = "started"
-	pause     State = "paused"
-	resume    State = "resumed"
-	terminate State = "terminated"
-)
-
 // KeyTracker holds the channels for handling key presses and
 // indicating when word/line delimiter characters are encountered or
 // backspace is pressed
 type KeyTracker struct {
 	events          *LinuxKeyboard.LinuxKeyboard
+	typedWord       chan typed
+	pause           bool
 	ShowCorrections bool
+	corrections     *corrections
 	Signaller       chan State
 }
 
 func (kt *KeyTracker) EventWatcher(wordStats *wordstats.WordStats) {
-	go kt.handler(kt.Signaller, wordStats)
-	kt.Signaller <- start
+	go kt.slurpWords()
+	go kt.checkWord(wordStats)
 }
 
-func (kt *KeyTracker) handler(signaller chan State, wordStats *wordstats.WordStats) {
-	done := make(chan struct{})
-
+func (kt *KeyTracker) slurpWords() {
+	charBuf := new(bytes.Buffer)
+	log.Debug("Start snooping keys...")
+	ev := kt.events.StartSnooping()
 	for {
-		signal := <-signaller
-
-		switch signal {
-		case resume:
-			log.Debug("Resuming...")
-			go kt.snoopKeys(wordStats, done)
-		case pause:
-			log.Debug("Pausing...")
-			done <- struct{}{}
-		case start:
-			log.Debugf("Starting")
-			go kt.snoopKeys(wordStats, done)
-		case terminate:
-			log.Debug("Terminating...")
-			done <- struct{}{}
-			return
-		default:
-			log.Println("unknown signal")
-			return
-		}
-	}
-}
-
-func (kt *KeyTracker) snoopKeys(stats *wordstats.WordStats, done <-chan struct{}) {
-	word := newWord()
-	for {
-		select {
-		case <-done:
-			log.Debug("Stop snooping keys...")
-			kt.events.StopSnooping()
-			return
-		default:
-			log.Debug("Start snooping keys...")
-			ev := kt.events.StartSnooping()
-			for e := range ev {
+		for e := range ev {
+			switch {
+			case kt.pause:
+				charBuf.Reset()
+			case e.Key.IsKeyPress():
+				log.Debugf("Pressed key -- value: %d code: %d type: %d string: %s rune: %d (%c)", e.Key.Value, e.Key.Code, e.Key.Type, e.AsString, e.AsRune, e.AsRune)
+			case e.Key.IsKeyRelease():
+				log.Debugf("Released key -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
 				switch {
-				case e.Key.IsKeyPress():
-					log.Debugf("Pressed key -- value: %d code: %d type: %d string: %s rune: %d (%c)", e.Key.Value, e.Key.Code, e.Key.Type, e.AsString, e.AsRune, e.AsRune)
-					switch {
-					case e.AsRune == rune('\b'):
-						word.removeBuf()
-					case unicode.IsDigit(e.AsRune) || unicode.IsLetter(e.AsRune):
-						word.appendBuf(e.AsRune)
-					case unicode.IsPunct(e.AsRune) || unicode.IsSymbol(e.AsRune) || unicode.IsSpace(e.AsRune):
-						if word.getLength() > 0 {
-							typo := word.getString()
-							punct := e.AsRune
-							correction := kt.checkWord(typo, stats)
-							if correction != "" {
-								stats.AddCorrected(typo, correction)
-								kt.correctWord(typo, correction, punct)
-							} else {
-								stats.AddChecked(typo)
-							}
-							word.clear()
-						}
-					case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
-						<-ev
-						word.clear()
-					case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
-					// case unicode.IsPrint(e.AsRune):
-					// 	log.Debugf("Got unhandled printable character: (rune %d, string %c, unicode %U", e.AsRune, e.AsRune, e.AsRune)
-					default:
-						word.clear()
+				case e.AsRune == rune('\b'):
+					if charBuf.Len() > 0 {
+						charBuf.Truncate(charBuf.Len() - 1)
 					}
-				case e.Key.IsKeyRelease():
-					log.Debugf("Released key -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
+				case unicode.IsDigit(e.AsRune) || unicode.IsLetter(e.AsRune):
+					charBuf.WriteRune(e.AsRune)
+				case unicode.IsPunct(e.AsRune) || unicode.IsSymbol(e.AsRune) || unicode.IsSpace(e.AsRune):
+					if charBuf.Len() > 0 {
+						t := &typed{
+							word:  charBuf.String(),
+							punct: e.AsRune,
+						}
+						charBuf.Reset()
+						kt.typedWord <- *t
+					}
+				case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
+					// absorb the ctrl/alt/meta key and then reset the buffer
+					<-ev
+					charBuf.Reset()
+				case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
 				default:
-					log.Debugf("Other event -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
+					charBuf.Reset()
 				}
+			default:
+				log.Debugf("Other event -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
 			}
 		}
 	}
 }
 
-func (kt *KeyTracker) checkWord(word string, stats *wordstats.WordStats) string {
-	corrections := newCorrections()
-	return corrections.findCorrection(word)
+type typed struct {
+	word  string
+	punct rune
 }
 
-func (kt *KeyTracker) correctWord(word string, correction string, punctuation rune) {
-	// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
-	// TODO: use an accurate number for the latency
-	time.Sleep(15 * time.Millisecond)
-	// Erase the existing word.
-	// Effectively, hit backspace key for the length of the word plus the punctuation mark.
-	log.Debugf("Making correction %s to %s", word, correction)
-	for i := 0; i <= len(word); i++ {
-		kt.events.TypeBackSpace()
-	}
-	// Insert the replacement.
-	// Type out the replacement and whatever delimiter was after it.
-	kt.events.TypeString(correction)
-	kt.events.TypeString(string(punctuation))
-	if kt.ShowCorrections {
-		beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", word, correction), "")
+func (kt *KeyTracker) checkWord(stats *wordstats.WordStats) {
+	for typed := range kt.typedWord {
+		correction := kt.corrections.findCorrection(typed.word)
+		if correction != "" {
+			stats.AddCorrected(typed.word, correction)
+			kt.pause = true
+			// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
+			// TODO: use an accurate number for the latency
+			time.Sleep(60 * time.Millisecond)
+			// Erase the existing word.
+			// Effectively, hit backspace key for the length of the word plus the punctuation mark.
+			log.Debugf("Making correction %s to %s", typed.word, correction)
+			for i := 0; i <= len(typed.word); i++ {
+				kt.events.TypeBackSpace()
+			}
+			// Insert the replacement.
+			// Type out the replacement and whatever delimiter was after it.
+			log.Debugf("punctuation is '%v'", string(typed.punct))
+			kt.events.TypeString(correction + string(typed.punct))
+			// kt.events.TypeString(string(punctuation))
+			if kt.ShowCorrections {
+				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", typed.word, correction), "")
+			}
+			kt.pause = false
+		} else {
+			stats.AddChecked(typed.word)
+		}
 	}
 }
 
@@ -151,43 +123,12 @@ func NewKeyTracker() *KeyTracker {
 	close(ch)
 	return &KeyTracker{
 		events:          LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
+		typedWord:       make(chan typed),
+		pause:           false,
 		ShowCorrections: false,
+		corrections:     newCorrections(),
 		Signaller:       make(chan State),
 	}
-}
-
-type word struct {
-	charBuf *bytes.Buffer
-}
-
-func (w *word) clearBuf() {
-	w.charBuf.Reset()
-}
-
-func (w *word) appendBuf(char rune) {
-	w.charBuf.WriteRune(char)
-}
-
-func (w *word) removeBuf() {
-	if w.charBuf.Len() > 0 {
-		w.charBuf.Truncate(w.charBuf.Len() - 1)
-	}
-}
-
-func (w *word) getString() string {
-	return w.charBuf.String()
-}
-
-func (w *word) getLength() int {
-	return w.charBuf.Len()
-}
-
-func (w *word) clear() {
-	w.clearBuf()
-}
-
-func newWord() *word {
-	return &word{charBuf: new(bytes.Buffer)}
 }
 
 type corrections struct {

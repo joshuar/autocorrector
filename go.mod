@@ -14,7 +14,7 @@ require (
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-vgo/robotgo v0.93.1
 	github.com/gopherjs/gopherjs v0.0.0-20210202160940-bed99a852dfe // indirect
-	github.com/joshuar/go-linuxkeyboard v0.0.0-20210328074449-5e3c70c883ab
+	github.com/joshuar/go-linuxkeyboard v0.0.0-20210403001849-f1a8e32b91b9
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/magiconair/properties v1.8.4 // indirect
