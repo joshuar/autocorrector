@@ -3,146 +3,156 @@ package keytracker
 import (
 	"bytes"
 	"fmt"
+	"time"
 	"unicode"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
-	"github.com/go-vgo/robotgo"
 	"github.com/joshuar/autocorrector/internal/wordstats"
-	hook "github.com/robotn/gohook"
+	"github.com/joshuar/go-linuxkeyboard/pkg/LinuxKeyboard"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+)
+
+type State string
+
+const (
+	start     State = "started"
+	pause     State = "paused"
+	resume    State = "resumed"
+	terminate State = "terminated"
 )
 
 // KeyTracker holds the channels for handling key presses and
 // indicating when word/line delimiter characters are encountered or
 // backspace is pressed
 type KeyTracker struct {
-	events          chan hook.Event
-	wordChar        chan rune
-	punctChar       chan rune
-	controlChar     chan bool
-	backspaceChar   chan bool
-	StopSnooping    chan bool
-	StartSnooping   chan bool
+	events          *LinuxKeyboard.LinuxKeyboard
 	ShowCorrections bool
+	Signaller       chan State
 }
 
-func isControl(k uint16) bool {
-	var controlKeycode = []uint16{1, 14, 15, 29, 56, 28, 3675, 3676, 3640, 57416, 57424, 57419, 57421}
-	for i := 0; i < len(controlKeycode); i++ {
-		if controlKeycode[i] == k {
-			return true
+func (kt *KeyTracker) EventWatcher(wordStats *wordstats.WordStats) {
+	go kt.handler(kt.Signaller, wordStats)
+	kt.Signaller <- start
+}
+
+func (kt *KeyTracker) handler(signaller chan State, wordStats *wordstats.WordStats) {
+	done := make(chan struct{})
+
+	for {
+		signal := <-signaller
+
+		switch signal {
+		case resume:
+			log.Debug("Resuming...")
+			go kt.snoopKeys(wordStats, done)
+		case pause:
+			log.Debug("Pausing...")
+			done <- struct{}{}
+		case start:
+			log.Debugf("Starting")
+			go kt.snoopKeys(wordStats, done)
+		case terminate:
+			log.Debug("Terminating...")
+			done <- struct{}{}
+			return
+		default:
+			log.Println("unknown signal")
+			return
 		}
 	}
-	return false
 }
 
-// SnoopKeys listens for key presses and fires on the appropriate channel
-func (kt *KeyTracker) SnoopKeys() {
+func (kt *KeyTracker) snoopKeys(stats *wordstats.WordStats, done <-chan struct{}) {
+	word := newWord()
 	for {
 		select {
-		case <-kt.StopSnooping:
-			log.Debug("Stopping event tracking...")
-			hook.End()
-		case <-kt.StartSnooping:
-			log.Debug("Starting event tracking...")
-			kt.events = hook.Start()
-			go func() {
-				for e := range kt.events {
+		case <-done:
+			log.Debug("Stop snooping keys...")
+			kt.events.StopSnooping()
+			return
+		default:
+			log.Debug("Start snooping keys...")
+			ev := kt.events.StartSnooping()
+			for e := range ev {
+				switch {
+				case e.Key.IsKeyPress():
+					log.Debugf("Pressed key -- value: %d code: %d type: %d string: %s rune: %d (%c)", e.Key.Value, e.Key.Code, e.Key.Type, e.AsString, e.AsRune, e.AsRune)
 					switch {
-					case e.Keychar == rune('\b'):
-						kt.backspaceChar <- true
-					case unicode.IsDigit(e.Keychar) || unicode.IsLetter(e.Keychar):
-						kt.wordChar <- e.Keychar
-					case unicode.IsPunct(e.Keychar) || unicode.IsSymbol(e.Keychar) || unicode.IsSpace(e.Keychar):
-						kt.punctChar <- e.Keychar
-					case isControl(e.Keycode): //unicode.IsControl(e.Keychar):
-						kt.controlChar <- true
-					case unicode.IsPrint(e.Keychar):
-						log.Debugf("Got unhandled printable character: %v", string(e.Keychar))
+					case e.AsRune == rune('\b'):
+						word.removeBuf()
+					case unicode.IsDigit(e.AsRune) || unicode.IsLetter(e.AsRune):
+						word.appendBuf(e.AsRune)
+					case unicode.IsPunct(e.AsRune) || unicode.IsSymbol(e.AsRune) || unicode.IsSpace(e.AsRune):
+						if word.getLength() > 0 {
+							typo := word.getString()
+							punct := e.AsRune
+							correction := kt.checkWord(typo, stats)
+							if correction != "" {
+								stats.AddCorrected(typo, correction)
+								kt.correctWord(typo, correction, punct)
+							} else {
+								stats.AddChecked(typo)
+							}
+							word.clear()
+						}
+					case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
+						<-ev
+						word.clear()
+					case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
+					// case unicode.IsPrint(e.AsRune):
+					// 	log.Debugf("Got unhandled printable character: (rune %d, string %c, unicode %U", e.AsRune, e.AsRune, e.AsRune)
 					default:
+						word.clear()
 					}
+				case e.Key.IsKeyRelease():
+					log.Debugf("Released key -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
+				default:
+					log.Debugf("Other event -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
 				}
-			}()
-		}
-	}
-}
-
-// SlurpWord slurps up key presses into words where appropriate
-func (kt *KeyTracker) SlurpWord(stats *wordstats.WordStats) {
-	corrections := newCorrections()
-	w := newWord()
-	for {
-		select {
-		// got a letter or apostrophe key, append to create a word
-		case key := <-kt.wordChar:
-			w.appendBuf(key)
-		// got the backspace key, remove last character from the buffer
-		case <-kt.backspaceChar:
-			log.Debug("removing char")
-			w.removeBuf()
-		// got a word delim key, we've got a word, find a replacement
-		case punct := <-kt.punctChar:
-			// don't do anything if it's just a punctuation mark only
-			if w.getLength() > 0 {
-				log.Debugf("Checking word %v for corrections...", w.getString())
-				correction := corrections.findCorrection(w.getString())
-				kt.correctWord(stats, w.getString(), correction, w.getLength(), string(punct))
-				w.clear()
 			}
-		// got the line delim or navigational key, clear the current word
-		case <-kt.controlChar:
-			w.clear()
 		}
 	}
 }
 
-func (kt *KeyTracker) correctWord(stats *wordstats.WordStats, word string, correction string, length int, punctuation string) {
-	if correction != "" {
-		// Update our stats.
-		go stats.AddCorrected(word, correction)
-		// stop key snooping
-		kt.StopSnooping <- true
-		// Erase the existing word.
-		// Effectively, hit backspace key for the length of the word plus the punctuation mark.
-		log.Debugf("Making correction %v to %v", word, correction)
-		for i := 0; i <= length; i++ {
-			robotgo.KeyTap("backspace")
-		}
-		// Insert the replacement.
-		// Type out the replacement and whatever delimiter was after it.
-		robotgo.TypeStr(correction)
-		robotgo.KeyTap(punctuation)
-		// restart key snooping
-		kt.StartSnooping <- true
-		if kt.ShowCorrections {
-			beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", word, correction), "")
-		}
-	} else {
-		go stats.AddChecked(word)
+func (kt *KeyTracker) checkWord(word string, stats *wordstats.WordStats) string {
+	corrections := newCorrections()
+	return corrections.findCorrection(word)
+}
+
+func (kt *KeyTracker) correctWord(word string, correction string, punctuation rune) {
+	// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
+	// TODO: use an accurate number for the latency
+	time.Sleep(15 * time.Millisecond)
+	// Erase the existing word.
+	// Effectively, hit backspace key for the length of the word plus the punctuation mark.
+	log.Debugf("Making correction %s to %s", word, correction)
+	for i := 0; i <= len(word); i++ {
+		kt.events.TypeBackSpace()
+	}
+	// Insert the replacement.
+	// Type out the replacement and whatever delimiter was after it.
+	kt.events.TypeString(correction)
+	kt.events.TypeString(string(punctuation))
+	if kt.ShowCorrections {
+		beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", word, correction), "")
 	}
 }
 
 // CloseKeyTracker shuts down the channels used for key tracking
 func (kt *KeyTracker) CloseKeyTracker() {
-	close(kt.wordChar)
-	close(kt.punctChar)
-	close(kt.controlChar)
-	close(kt.backspaceChar)
 }
 
 // NewKeyTracker creates a new keyTracker struct
 func NewKeyTracker() *KeyTracker {
+	ch := make(chan struct{})
+	close(ch)
 	return &KeyTracker{
-		events:          make(chan hook.Event),
-		wordChar:        make(chan rune),
-		punctChar:       make(chan rune),
-		controlChar:     make(chan bool),
-		backspaceChar:   make(chan bool),
-		StartSnooping:   make(chan bool),
-		StopSnooping:    make(chan bool),
+		events:          LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
 		ShowCorrections: false,
+		Signaller:       make(chan State),
 	}
 }
 
@@ -208,7 +218,7 @@ func newCorrections() *corrections {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
 		} else {
-			log.Fatal(fmt.Errorf("Fatal error config file: %s", err))
+			log.Fatal(fmt.Errorf("fatal error config file: %s", err))
 		}
 	}
 	corrections := &corrections{
@@ -219,7 +229,7 @@ func newCorrections() *corrections {
 	viper.Unmarshal(&corrections.correctionList)
 	go func() {
 		for {
-			select {
+			switch {
 			case <-corrections.updateCorrections:
 				corrections.checkConfig()
 				viper.Unmarshal(&corrections.correctionList)

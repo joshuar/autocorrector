@@ -24,8 +24,6 @@ var (
 	wordStats   *wordstats.WordStats
 	cfgFile     string
 	debugFlag   bool
-	cpuProfile  string
-	memProfile  string
 	profileFlag bool
 	rootCmd     = &cobra.Command{
 		Use:   "autocorrector",
@@ -70,7 +68,7 @@ func initConfig() {
 
 	home, err := homedir.Dir()
 	if err != nil {
-		log.Fatal(fmt.Errorf("Fatal finding home directory: %s", err))
+		log.Fatal(fmt.Errorf("fatal finding home directory: %s", err))
 		os.Exit(1)
 	}
 
@@ -88,6 +86,7 @@ func initConfig() {
 func onReady() {
 	keyTracker = keytracker.NewKeyTracker()
 	wordStats = wordstats.OpenWordStats()
+	go keyTracker.EventWatcher(wordStats)
 
 	systray.SetIcon(icon.Data)
 	systray.SetTitle("Autocorrector")
@@ -97,21 +96,15 @@ func onReady() {
 	mStats := systray.AddMenuItem("Stats", "Show current stats")
 	mQuit := systray.AddMenuItem("Quit", "Quit Autocorrector")
 
-	go keyTracker.SlurpWord(wordStats)
-	go keyTracker.SnoopKeys()
-	keyTracker.StartSnooping <- true
-
 	for {
 		select {
 		case <-mEnabled.ClickedCh:
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
-				keyTracker.StopSnooping <- true
 				log.Info("Disabling Autocorrector")
 				beeep.Notify("Autocorrector disabled", "Temporarily disabling autocorrector", "")
 			} else {
 				mEnabled.Check()
-				keyTracker.StartSnooping <- true
 				log.Info("Enabling Autocorrector")
 				beeep.Notify("Autocorrector enabled", "Re-enabling autocorrector", "")
 
