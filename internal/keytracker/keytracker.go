@@ -7,7 +7,7 @@ import (
 	"unicode"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/gen2brain/beeep"
+	ipc "github.com/james-barrow/golang-ipc"
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	"github.com/joshuar/go-linuxkeyboard/pkg/LinuxKeyboard"
 
@@ -23,10 +23,11 @@ type State string
 type KeyTracker struct {
 	events          *LinuxKeyboard.LinuxKeyboard
 	typedWord       chan typed
-	pause           bool
+	Pause           bool
 	ShowCorrections bool
 	corrections     *corrections
 	Signaller       chan State
+	ipcServer       *ipc.Server
 }
 
 func (kt *KeyTracker) EventWatcher(wordStats *wordstats.WordStats) {
@@ -41,7 +42,7 @@ func (kt *KeyTracker) slurpWords() {
 	for {
 		for e := range ev {
 			switch {
-			case kt.pause:
+			case kt.Pause:
 				charBuf.Reset()
 			case e.Key.IsKeyPress():
 				log.Debugf("Pressed key -- value: %d code: %d type: %d string: %s rune: %d (%c)", e.Key.Value, e.Key.Code, e.Key.Type, e.AsString, e.AsRune, e.AsRune)
@@ -64,7 +65,7 @@ func (kt *KeyTracker) slurpWords() {
 						kt.typedWord <- *t
 					}
 				case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
-					// absorb the ctrl/alt/meta key and then reset the buffer
+					// absorb the ctrl/alt/me	ta key and then reset the buffer
 					<-ev
 					charBuf.Reset()
 				case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
@@ -88,7 +89,7 @@ func (kt *KeyTracker) checkWord(stats *wordstats.WordStats) {
 		correction := kt.corrections.findCorrection(typed.word)
 		if correction != "" {
 			stats.AddCorrected(typed.word, correction)
-			kt.pause = true
+			kt.Pause = true
 			// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
 			// TODO: use an accurate number for the latency
 			time.Sleep(60 * time.Millisecond)
@@ -104,9 +105,10 @@ func (kt *KeyTracker) checkWord(stats *wordstats.WordStats) {
 			kt.events.TypeString(correction + string(typed.punct))
 			// kt.events.TypeString(string(punctuation))
 			if kt.ShowCorrections {
-				beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", typed.word, correction), "")
+				kt.ipcServer.Write(22, []byte(fmt.Sprintf("Replaced %s with %s", typed.word, correction)))
+				// beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", typed.word, correction), "")
 			}
-			kt.pause = false
+			kt.Pause = false
 		} else {
 			stats.AddChecked(typed.word)
 		}
@@ -118,16 +120,17 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker() *KeyTracker {
+func NewKeyTracker(sc *ipc.Server) *KeyTracker {
 	ch := make(chan struct{})
 	close(ch)
 	return &KeyTracker{
 		events:          LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
 		typedWord:       make(chan typed),
-		pause:           false,
-		ShowCorrections: false,
+		Pause:           true,
+		ShowCorrections: true,
 		corrections:     newCorrections(),
 		Signaller:       make(chan State),
+		ipcServer:       sc,
 	}
 }
 
