@@ -7,15 +7,13 @@ import (
 	"unicode"
 
 	"github.com/fsnotify/fsnotify"
-	ipc "github.com/james-barrow/golang-ipc"
+	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	"github.com/joshuar/go-linuxkeyboard/pkg/LinuxKeyboard"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
-
-type State string
 
 // KeyTracker holds the channels for handling key presses and
 // indicating when word/line delimiter characters are encountered or
@@ -26,18 +24,42 @@ type KeyTracker struct {
 	Pause           bool
 	ShowCorrections bool
 	corrections     *corrections
-	Signaller       chan State
-	ipcServer       *ipc.Server
 }
 
-func (kt *KeyTracker) EventWatcher(wordStats *wordstats.WordStats) {
+func (kt *KeyTracker) EventWatcher(socket *control.ControlSocket) {
+	stats := wordstats.OpenWordStats()
 	go kt.slurpWords()
-	go kt.checkWord(wordStats)
+	go kt.checkWord(socket, stats)
+	go socket.AcceptConnections()
+	socket.SendMessage(control.ServerStarted, nil)
+	for msg := range socket.Data {
+		switch {
+		case msg.Type == control.PauseServer:
+			kt.Pause = true
+		case msg.Type == control.ResumeServer:
+			kt.Pause = false
+		case msg.Type == control.HideNotifications:
+			kt.ShowCorrections = false
+		case msg.Type == control.ShowNotifications:
+			kt.ShowCorrections = true
+		case msg.Type == control.GetStats:
+			notificationData := &control.NotificationData{
+				Title: "Current Stats",
+				Message: fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
+					stats.GetCheckedTotal(),
+					stats.GetCorrectedTotal(),
+					stats.CalcAccuracy()),
+			}
+			socket.SendMessage(control.Notification, notificationData)
+		default:
+			log.Debugf("Unhandled message recieved: %v", msg)
+		}
+	}
+
 }
 
 func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
-	log.Debug("Start snooping keys...")
 	ev := kt.events.StartSnooping()
 	for {
 		for e := range ev {
@@ -84,7 +106,8 @@ type typed struct {
 	punct rune
 }
 
-func (kt *KeyTracker) checkWord(stats *wordstats.WordStats) {
+func (kt *KeyTracker) checkWord(socket *control.ControlSocket, stats *wordstats.WordStats) {
+
 	for typed := range kt.typedWord {
 		correction := kt.corrections.findCorrection(typed.word)
 		if correction != "" {
@@ -100,13 +123,14 @@ func (kt *KeyTracker) checkWord(stats *wordstats.WordStats) {
 				kt.events.TypeBackSpace()
 			}
 			// Insert the replacement.
-			// Type out the replacement and whatever delimiter was after it.
-			log.Debugf("punctuation is '%v'", string(typed.punct))
+			// Type out the replacement and whatever punctuation/delimiter was after it.
 			kt.events.TypeString(correction + string(typed.punct))
-			// kt.events.TypeString(string(punctuation))
 			if kt.ShowCorrections {
-				kt.ipcServer.Write(22, []byte(fmt.Sprintf("Replaced %s with %s", typed.word, correction)))
-				// beeep.Notify("Correction!", fmt.Sprintf("Replaced %s with %s", typed.word, correction), "")
+				notificationData := &control.NotificationData{
+					Title:   "Correction!",
+					Message: fmt.Sprintf("Replaced %s with %s", typed.word, correction),
+				}
+				socket.SendMessage(control.Notification, notificationData)
 			}
 			kt.Pause = false
 		} else {
@@ -120,17 +144,15 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(sc *ipc.Server) *KeyTracker {
+func NewKeyTracker() *KeyTracker {
 	ch := make(chan struct{})
 	close(ch)
 	return &KeyTracker{
 		events:          LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
 		typedWord:       make(chan typed),
 		Pause:           true,
-		ShowCorrections: true,
+		ShowCorrections: false,
 		corrections:     newCorrections(),
-		Signaller:       make(chan State),
-		ipcServer:       sc,
 	}
 }
 

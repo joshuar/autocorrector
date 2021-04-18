@@ -5,15 +5,15 @@ import (
 	_ "net/http/pprof"
 	"os"
 
+	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/keytracker"
-	"github.com/joshuar/autocorrector/internal/wordstats"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var (
 	keyTracker  *keytracker.KeyTracker
-	wordStats   *wordstats.WordStats
+	socket      *control.ControlSocket
 	userFlag    string
 	debugFlag   bool
 	profileFlag bool
@@ -30,12 +30,9 @@ var (
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			// socket := control.newServerSocket(userFlag)
-			// socket.AcceptConnections()
-
-			// keyTracker = keytracker.NewKeyTracker()
-			// wordStats = wordstats.OpenWordStats()
-			// go keyTracker.EventWatcher(wordStats)
+			keyTracker = keytracker.NewKeyTracker()
+			socket = control.NewServerSocket(userFlag)
+			keyTracker.EventWatcher(socket)
 		},
 	}
 )

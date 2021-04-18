@@ -2,14 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"net"
 	"os"
-	"os/user"
 	"strings"
-	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
+	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/icon"
 	homedir "github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
@@ -39,17 +38,26 @@ func init() {
 
 func onReady() {
 
-	// socket := control.newClientSocket()
-	// go socket.AcceptConnections()
-
-	letters := []string{"a", "e", "i", "o", "u"}
-
-	for i := range letters {
-		SendMessage([]byte(letters[i]))
-		time.Sleep(1 * time.Second)
-	}
-
-	os.Exit(0)
+	socket := control.NewClientSocket()
+	go socket.AcceptConnections()
+	socket.SendMessage(control.ResumeServer, nil)
+	go func() {
+		for msg := range socket.Data {
+			switch {
+			case msg.Type == control.ServerStarted:
+				log.Debug("Server has started")
+				socket.SendMessage(control.ResumeServer, nil)
+			case msg.Type == control.ServerStopped:
+				log.Debug("Server has stopped")
+			case msg.Type == control.Notification:
+				notificationData := msg.Data.(control.NotificationData)
+				spew.Dump(msg)
+				beeep.Notify(notificationData.Title, notificationData.Message, "")
+			default:
+				log.Debugf("Unhandled message recieved: %v", msg)
+			}
+		}
+	}()
 
 	systray.SetIcon(icon.Data)
 	systray.SetTitle("Autocorrector")
@@ -64,24 +72,22 @@ func onReady() {
 		case <-mEnabled.ClickedCh:
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
-				log.Info("Disabling Autocorrector")
-				// keyTracker.Pause = true
+				socket.SendMessage(control.PauseServer, nil)
 				beeep.Notify("Autocorrector disabled", "Temporarily disabling autocorrector", "")
 			} else {
 				mEnabled.Check()
-				log.Info("Enabling Autocorrector")
-				// keyTracker.Pause = false
+				socket.SendMessage(control.ResumeServer, nil)
 				beeep.Notify("Autocorrector enabled", "Re-enabling autocorrector", "")
 
 			}
 		case <-mCorrections.ClickedCh:
 			if mCorrections.Checked() {
 				mCorrections.Uncheck()
-				// keyTracker.ShowCorrections = false
+				socket.SendMessage(control.HideNotifications, nil)
 				beeep.Notify("Hiding Corrections", "Hiding notifications for corrections", "")
 			} else {
 				mCorrections.Check()
-				// keyTracker.ShowCorrections = true
+				socket.SendMessage(control.ShowNotifications, nil)
 				beeep.Notify("Showing Corrections", "Notifications for corrections will be shown as they are made", "")
 
 			}
@@ -89,19 +95,12 @@ func onReady() {
 			log.Info("Requesting quit")
 			systray.Quit()
 		case <-mStats.ClickedCh:
-			beeep.Notify("Current Stats",
-				fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
-					wordStats.GetCheckedTotal(),
-					wordStats.GetCorrectedTotal(),
-					wordStats.CalcAccuracy()),
-				"")
+			socket.SendMessage(control.GetStats, nil)
 		}
 	}
 }
 
 func onExit() {
-	wordStats.CloseWordStats()
-	keyTracker.CloseKeyTracker()
 }
 
 // initConfig reads in config file
@@ -125,21 +124,4 @@ func initConfig() {
 		viper.SetConfigFile(cfgFileDefault)
 		log.Debug("Using default config file: ", cfgFileDefault)
 	}
-}
-
-func SendMessage(message []byte) {
-	user, err := user.Lookup("joshua")
-	if err != nil {
-		log.Fatal(err)
-	}
-	c, err := net.Dial("unix", "/tmp/autocorrector"+user.Username+".sock")
-	if err != nil {
-		log.Errorf("Failed to dial: %s", err)
-	}
-	defer c.Close()
-	count, err := c.Write(message)
-	if err != nil {
-		log.Errorf("Write error: %s", err)
-	}
-	log.Infof("Wrote %d bytes", count)
 }
