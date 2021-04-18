@@ -33,7 +33,6 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(clientCmd)
 	rootCmd.Flags().StringVar(&correctionsFlag, "corrections", "", "list of corrections (default is $HOME/.config/autocorrector/corrections.toml)")
-	// statsCmd.Flags().BoolVarP(&logStatsFlag, "log", "l", false, "Show log of corrections")
 }
 
 func onReady() {

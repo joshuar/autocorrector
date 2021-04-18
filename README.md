@@ -1,9 +1,7 @@
 
-![Apache 2.0](https://img.shields.io/github/license/joshuar/autocorrector)
+![Apache 2.0](https://img.shields.io/github/license/joshuar/autocorrector) ![GitHub last commit](https://img.shields.io/github/last-commit/joshuar/autocorrector) 
 
 # Autocorrector
-
-:warning: **This is alpha software**
 
 ## What is it?
 
@@ -20,7 +18,6 @@ The following Go libraries and tools made autocorrector infinitely easier:
 - [Logrus](https://github.com/sirupsen/logrus):  structured logger for Go (golang), completely API compatible with the standard library logger.
 - [Viper](https://github.com/spf13/viper): Go configuration with fangs!
 - [Cobra](https://github.com/spf13/cobra): A Commander for modern Go CLI interactions.
-- [robotgo](https://github.com/go-vgo/robotgo): Go Native cross-platform GUI system automation. Control the mouse, keyboard and other.
 - [systray](https://github.com/getlantern/systray): A cross-platform Go library to place an icon and menu in the notification area.
 - [beeep](https://github.com/gen2brain/beeep): a cross-platform library for sending desktop notifications and beeps.
 - [bbolt](https://github.com/etcd-io/bbolt): a pure Go key/value store.
@@ -40,12 +37,12 @@ Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-error
 
 1. Download and install in your GOPATH:
 
-```
+```shell
 go get github.com/joshuar/autocorrector
 cd $GOPATH/src/github.com/joshuar/autocorrector
 go install
 ```
 
-2. Run the command with `autocorrector` from `$GOPATH/bin/autocorrector` or use the provided systemd service file to start it with your user systemd instance.
+2. autocorrector has a client-server model.  Run the server as root (required to read devices from the kernel keyboard device) with `autocorrector --user <yourusername>`.  Run the client with `autocorrector client`.
 
 

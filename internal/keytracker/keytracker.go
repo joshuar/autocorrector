@@ -26,6 +26,9 @@ type KeyTracker struct {
 	corrections     *corrections
 }
 
+// EventWatcher opens the stats database, starts a goroutine to "slurp" words,
+// starts a goroutine to check for corrections and opens a socket for server
+// control
 func (kt *KeyTracker) EventWatcher(socket *control.ControlSocket) {
 	stats := wordstats.OpenWordStats()
 	go kt.slurpWords()
