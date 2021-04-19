@@ -31,7 +31,7 @@ var (
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			keyTracker = keytracker.NewKeyTracker()
-			socket = control.NewServerSocket(userFlag)
+			socket = control.NewSocket(userFlag)
 			keyTracker.EventWatcher(socket)
 		},
 	}

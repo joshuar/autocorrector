@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
 	"github.com/joshuar/autocorrector/internal/control"
@@ -37,12 +36,16 @@ func init() {
 
 func onReady() {
 
-	socket := control.NewClientSocket()
-	go socket.AcceptConnections()
+	socket := control.NewSocket("")
+	manager := control.NewConnManager()
+	go manager.Start()
+	go socket.AcceptConnections(manager)
 	socket.SendMessage(control.ResumeServer, nil)
 	go func() {
 		for msg := range socket.Data {
 			switch {
+			case msg.Type == control.Acknowledge:
+				log.Debugf("Got acknowledgement from server: %s", msg.Data.(string))
 			case msg.Type == control.ServerStarted:
 				log.Debug("Server has started")
 				socket.SendMessage(control.ResumeServer, nil)
@@ -50,7 +53,6 @@ func onReady() {
 				log.Debug("Server has stopped")
 			case msg.Type == control.Notification:
 				notificationData := msg.Data.(control.NotificationData)
-				spew.Dump(msg)
 				beeep.Notify(notificationData.Title, notificationData.Message, "")
 			default:
 				log.Debugf("Unhandled message recieved: %v", msg)

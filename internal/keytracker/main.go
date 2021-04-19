@@ -33,18 +33,24 @@ func (kt *KeyTracker) EventWatcher(socket *control.ControlSocket) {
 	stats := wordstats.OpenWordStats()
 	go kt.slurpWords()
 	go kt.checkWord(socket, stats)
-	go socket.AcceptConnections()
-	socket.SendMessage(control.ServerStarted, nil)
+	manager := control.NewConnManager()
+	go manager.Start()
+	go socket.AcceptConnections(manager)
+	socket.SendMessage(control.Acknowledge, "Server Started")
 	for msg := range socket.Data {
 		switch {
 		case msg.Type == control.PauseServer:
 			kt.Pause = true
+			socket.SendMessage(control.Acknowledge, "Paused corrections")
 		case msg.Type == control.ResumeServer:
 			kt.Pause = false
+			socket.SendMessage(control.Acknowledge, "Resumed corrections")
 		case msg.Type == control.HideNotifications:
 			kt.ShowCorrections = false
+			socket.SendMessage(control.Acknowledge, "Hiding notifications")
 		case msg.Type == control.ShowNotifications:
 			kt.ShowCorrections = true
+			socket.SendMessage(control.Acknowledge, "Showing notifications")
 		case msg.Type == control.GetStats:
 			notificationData := &control.NotificationData{
 				Title: "Current Stats",
