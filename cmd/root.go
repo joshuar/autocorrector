@@ -12,8 +12,6 @@ import (
 )
 
 var (
-	keyTracker  *keytracker.KeyTracker
-	socket      *control.ControlSocket
 	userFlag    string
 	debugFlag   bool
 	profileFlag bool
@@ -30,9 +28,11 @@ var (
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			keyTracker = keytracker.NewKeyTracker()
-			socket = control.NewSocket(userFlag)
-			keyTracker.EventWatcher(socket)
+			manager := control.NewConnManager(userFlag)
+			go manager.Start()
+
+			keyTracker := keytracker.NewKeyTracker()
+			keyTracker.EventWatcher(manager)
 		},
 	}
 )

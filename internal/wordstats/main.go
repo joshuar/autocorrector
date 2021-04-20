@@ -112,7 +112,7 @@ func (w *WordStats) ShowStats() {
 // ShowLog prints out the full log of corrections history
 func (w *WordStats) ShowLog() {
 	var fullLog string
-	fullLog = fmt.Sprintf("Correction Log:\n")
+	fullLog = "Correction Log:\n"
 	w.db.View(func(tx *bolt.Tx) error {
 		// Assume bucket exists and has keys
 		b := tx.Bucket([]byte(correctionsBucket))
@@ -147,13 +147,13 @@ func decode(blob []byte) *wordAction {
 func OpenWordStats() *WordStats {
 	home, err := homedir.Dir()
 	if err != nil {
-		log.Fatal(fmt.Errorf("Fatal finding home directory: %s", err))
+		log.Fatal(fmt.Errorf("fatal finding home directory: %s", err))
 	}
 
 	// open the on-disk database
 	db, err := bolt.Open(strings.Join([]string{home, "/.config/autocorrector/stats.db"}, ""), 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
-		log.Fatal(fmt.Errorf("Error reading stats database (is autocorrector still running?): %s", err))
+		log.Fatal(fmt.Errorf("error reading stats database (is autocorrector still running?): %s", err))
 		os.Exit(1)
 	}
 	// make sure the top-level buckets exist
@@ -169,7 +169,7 @@ func OpenWordStats() *WordStats {
 
 		return nil
 	})
-
+	log.Debugf("Opened stats database at %s", db.Path())
 	return &WordStats{
 		db: db,
 	}

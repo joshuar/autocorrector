@@ -2,7 +2,7 @@ package control
 
 import (
 	"encoding/gob"
-	"io"
+	"fmt"
 	"net"
 	"os"
 	"os/user"
@@ -12,115 +12,61 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	Acknowledge        MsgType = 00
-	PauseServer        MsgType = 11
-	ResumeServer       MsgType = 12
-	StartServer        MsgType = 18
-	StopServer         MsgType = 19
-	CorrectionFound    MsgType = 21
-	CorrectionNotFound MsgType = 22
-	HideNotifications  MsgType = 31
-	ShowNotifications  MsgType = 32
-	Notification       MsgType = 33
-	GetStats           MsgType = 41
-	ServerStarted      MsgType = 98
-	ServerStopped      MsgType = 99
-)
-
-type MsgType int
-type ControlMessage struct {
-	Type MsgType
-	Data interface{}
+type StateMsg struct {
+	Start, Stop, Pause, Resume bool
 }
 
-type NotificationData struct {
-	Title, Message string
+type StatsMsg struct {
+	Word, Correction string
+}
+
+type Msg struct {
+	*StateMsg
+	*StatsMsg
 }
 
 type ControlSocket struct {
-	recevierName net.Listener
-	conn         io.ReadWriteCloser
-	receivePath  string
-	sendPath     string
-	Data         chan *ControlMessage
+	localSocket net.Listener
+	localPath   string
+	remotePath  string
 }
 
-func (s *ControlSocket) AcceptConnections(manager *ConnManager) {
+func (s *ControlSocket) AcceptConnections(r chan net.Conn) {
 	for {
-		conn, err := s.recevierName.Accept()
+		conn, err := s.localSocket.Accept()
 		if err != nil {
 			log.Fatalf("Error on accept: %s", err)
 		}
-		s.conn = conn
-		manager.register <- s
-		gob.Register(NotificationData{})
-		go s.recieveMessage()
+		r <- conn
 	}
 }
 
-func (s *ControlSocket) recieveMessage() {
-	dec := gob.NewDecoder(s.conn)
-	var m *ControlMessage
-	if err := dec.Decode(&m); err != nil {
-		log.Errorf("Error on read: %s", err)
-	}
-	s.Data <- m
-}
-
-func (s *ControlSocket) SendMessage(msgType MsgType, msgData interface{}) {
-	tryMessage := func() error {
-		c, err := net.Dial("unix", s.sendPath)
-		if err != nil {
-			log.Errorf("Failed to dial: %s", err)
-			return err
-		} else {
-			defer c.Close()
-			enc := gob.NewEncoder(c)
-			message := &ControlMessage{
-				Type: msgType,
-				Data: msgData,
-			}
-			if err := enc.Encode(message); err != nil {
-				log.Errorf("Write error: %s", err)
-			}
-			log.Debugf("Sent message: %v: %v", message.Type, message.Data)
-			return nil
-		}
-	}
-	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
-	if err != nil {
-		log.Errorf("Problem with connection backoff", err)
-	}
-}
-
-func NewSocket(username string) *ControlSocket {
+func NewSocketConnection(username string) *ControlSocket {
 	var u *user.User
 	var err error
-	var receivePath, sendPath string
+	var local, remote string
 	if username != "" {
 		u, err = user.Lookup(username)
-		receivePath = "/tmp/autocorrector-" + u.Username + "-server.sock"
-		sendPath = "/tmp/autocorrector-" + u.Username + "-client.sock"
+		local = "/tmp/autocorrector-" + u.Username + "-server.sock"
+		remote = "/tmp/autocorrector-" + u.Username + "-client.sock"
 	} else {
 		u, err = user.Current()
-		receivePath = "/tmp/autocorrector-" + u.Username + "-client.sock"
-		sendPath = "/tmp/autocorrector-" + u.Username + "-server.sock"
+		local = "/tmp/autocorrector-" + u.Username + "-client.sock"
+		remote = "/tmp/autocorrector-" + u.Username + "-server.sock"
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
 	s := &ControlSocket{
-		receivePath: receivePath,
-		sendPath:    sendPath,
-		Data:        make(chan *ControlMessage),
+		localSocket: listen(local),
+		localPath:   local,
+		remotePath:  remote,
 	}
-	s.recevierName = listen(s.receivePath)
 	if username != "" {
 		uid, _ := strconv.Atoi(u.Uid)
 		gid, _ := strconv.Atoi(u.Gid)
-		if err := os.Chown(s.receivePath, uid, gid); err != nil {
-			log.Fatalf("Unable to change ownership on socket file %s to %s:%s : %s", s.receivePath, 0, gid, err)
+		if err := os.Chown(s.localPath, uid, gid); err != nil {
+			log.Fatalf("Unable to change ownership on socket file %s to %s:%s : %s", s.localPath, 0, gid, err)
 		}
 	}
 	return s
@@ -136,42 +82,89 @@ func listen(socketPath string) net.Listener {
 }
 
 type ConnManager struct {
-	clients map[*ControlSocket]bool
-	// broadcast  chan *ControlMessage
-	register   chan *ControlSocket
-	unregister chan *ControlSocket
+	socket     *ControlSocket
+	register   chan net.Conn
+	unregister chan net.Conn
+	Data       chan interface{}
 }
 
 func (manager *ConnManager) Start() {
+	go manager.socket.AcceptConnections(manager.register)
 	for {
 		select {
 		case connection := <-manager.register:
-			manager.clients[connection] = true
-			log.Debug("New connection")
+			go manager.RecieveMessage(connection)
 		case connection := <-manager.unregister:
-			if _, ok := manager.clients[connection]; ok {
-				close(connection.Data)
-				delete(manager.clients, connection)
-				log.Debug("Connection ended")
-			}
-			// case message := <-manager.broadcast:
-			// 	for connection := range manager.clients {
-			// 		select {
-			// 		case connection.Data <- message:
-			// 		default:
-			// 			close(connection.Data)
-			// 			delete(manager.clients, connection)
-			// 		}
-			// 	}
+			connection.Close()
 		}
 	}
 }
 
-func NewConnManager() *ConnManager {
+func NewConnManager(user string) *ConnManager {
+	var s *ControlSocket
+	if user != "" {
+		s = NewSocketConnection(user)
+	} else {
+		s = NewSocketConnection("")
+	}
 	return &ConnManager{
-		clients: make(map[*ControlSocket]bool),
-		// broadcast:  make(chan []byte),
-		register:   make(chan *ControlSocket),
-		unregister: make(chan *ControlSocket),
+		socket:     s,
+		Data:       make(chan interface{}),
+		register:   make(chan net.Conn),
+		unregister: make(chan net.Conn),
+	}
+}
+
+func (manager *ConnManager) RecieveMessage(connection net.Conn) {
+	var m Msg
+	dec := gob.NewDecoder(connection)
+	if err := dec.Decode(&m); err == nil {
+		log.Debugf("Decoded msg: %v", m)
+		switch {
+		case m.StateMsg != nil:
+			manager.Data <- m.StateMsg
+		case m.StatsMsg != nil:
+			manager.Data <- m.StatsMsg
+		}
+	}
+	manager.unregister <- connection
+}
+
+func (manager *ConnManager) SendState(state *StateMsg) {
+	manager.SendMessage(state)
+}
+
+func (manager *ConnManager) SendStats(stats *StatsMsg) {
+	manager.SendMessage(stats)
+}
+
+func (manager *ConnManager) SendMessage(msgData interface{}) {
+	tryMessage := func() error {
+		conn, err := net.Dial("unix", manager.socket.remotePath)
+		if err != nil {
+			log.Errorf("Failed to dial: %s", err)
+			return err
+		}
+		enc := gob.NewEncoder(conn)
+		switch t := msgData.(type) {
+		case *StateMsg:
+			if err := enc.Encode(&Msg{StateMsg: t}); err != nil {
+				log.Errorf("Write error: %s", err)
+				return err
+			}
+		case *StatsMsg:
+			if err := enc.Encode(&Msg{StatsMsg: t}); err != nil {
+				log.Errorf("Write error: %s", err)
+				return err
+			}
+		default:
+			log.Debugf("Got %v", t)
+			return fmt.Errorf("unknown data to send: %v", t)
+		}
+		return nil
+	}
+	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Errorf("Problem with connection backoff", err)
 	}
 }

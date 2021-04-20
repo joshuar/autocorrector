@@ -8,7 +8,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/joshuar/autocorrector/internal/control"
-	"github.com/joshuar/autocorrector/internal/wordstats"
 	"github.com/joshuar/go-linuxkeyboard/pkg/LinuxKeyboard"
 
 	log "github.com/sirupsen/logrus"
@@ -19,94 +18,105 @@ import (
 // indicating when word/line delimiter characters are encountered or
 // backspace is pressed
 type KeyTracker struct {
-	events          *LinuxKeyboard.LinuxKeyboard
+	kbd             *LinuxKeyboard.LinuxKeyboard
+	kbdEvents       chan LinuxKeyboard.KeyboardEvent
 	typedWord       chan typed
-	Pause           bool
+	paused          bool
 	ShowCorrections bool
 	corrections     *corrections
+	statsCh         chan *control.StatsMsg
 }
 
 // EventWatcher opens the stats database, starts a goroutine to "slurp" words,
 // starts a goroutine to check for corrections and opens a socket for server
 // control
-func (kt *KeyTracker) EventWatcher(socket *control.ControlSocket) {
-	stats := wordstats.OpenWordStats()
+func (kt *KeyTracker) EventWatcher(manager *control.ConnManager) {
+	go kt.kbd.Snoop(kt.kbdEvents)
 	go kt.slurpWords()
-	go kt.checkWord(socket, stats)
-	manager := control.NewConnManager()
-	go manager.Start()
-	go socket.AcceptConnections(manager)
-	socket.SendMessage(control.Acknowledge, "Server Started")
-	for msg := range socket.Data {
-		switch {
-		case msg.Type == control.PauseServer:
-			kt.Pause = true
-			socket.SendMessage(control.Acknowledge, "Paused corrections")
-		case msg.Type == control.ResumeServer:
-			kt.Pause = false
-			socket.SendMessage(control.Acknowledge, "Resumed corrections")
-		case msg.Type == control.HideNotifications:
-			kt.ShowCorrections = false
-			socket.SendMessage(control.Acknowledge, "Hiding notifications")
-		case msg.Type == control.ShowNotifications:
-			kt.ShowCorrections = true
-			socket.SendMessage(control.Acknowledge, "Showing notifications")
-		case msg.Type == control.GetStats:
-			notificationData := &control.NotificationData{
-				Title: "Current Stats",
-				Message: fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
-					stats.GetCheckedTotal(),
-					stats.GetCorrectedTotal(),
-					stats.CalcAccuracy()),
+	go kt.checkWord()
+	go sendStats(manager, kt.statsCh)
+	// go sendNotifications(manager, kt.notifications)
+	manager.SendState(&control.StateMsg{Start: true})
+	for msg := range manager.Data {
+		switch t := msg.(type) {
+		case *control.StateMsg:
+			switch {
+			case t.Start:
+				kt.start()
+			case t.Pause:
+				kt.pause()
+			case t.Resume:
+				kt.resume()
 			}
-			socket.SendMessage(control.Notification, notificationData)
 		default:
 			log.Debugf("Unhandled message recieved: %v", msg)
 		}
 	}
+}
 
+func (kt *KeyTracker) start() error {
+	kt.paused = false
+	// kt.kbdEvents = make(chan LinuxKeyboard.KeyboardEvent)
+	// go kt.slurpWords()
+	// go kt.kbd.Snoop(kt.kbdEvents)
+	return nil
+}
+
+func (kt *KeyTracker) pause() error {
+	kt.paused = true
+	// close(kt.kbdEvents)
+	return nil
+}
+
+func (kt *KeyTracker) resume() error {
+	return kt.start()
 }
 
 func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
-	ev := kt.events.StartSnooping()
+	log.Debug("Started slurping words")
 	for {
-		for e := range ev {
-			switch {
-			case kt.Pause:
-				charBuf.Reset()
-			case e.Key.IsKeyPress():
-				log.Debugf("Pressed key -- value: %d code: %d type: %d string: %s rune: %d (%c)", e.Key.Value, e.Key.Code, e.Key.Type, e.AsString, e.AsRune, e.AsRune)
-			case e.Key.IsKeyRelease():
-				log.Debugf("Released key -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
-				switch {
-				case e.AsRune == rune('\b'):
-					if charBuf.Len() > 0 {
-						charBuf.Truncate(charBuf.Len() - 1)
-					}
-				case unicode.IsDigit(e.AsRune) || unicode.IsLetter(e.AsRune):
-					charBuf.WriteRune(e.AsRune)
-				case unicode.IsPunct(e.AsRune) || unicode.IsSymbol(e.AsRune) || unicode.IsSpace(e.AsRune):
-					if charBuf.Len() > 0 {
-						t := &typed{
-							word:  charBuf.String(),
-							punct: e.AsRune,
-						}
-						charBuf.Reset()
-						kt.typedWord <- *t
-					}
-				case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
-					// absorb the ctrl/alt/me	ta key and then reset the buffer
-					<-ev
-					charBuf.Reset()
-				case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
-				default:
-					charBuf.Reset()
-				}
-			default:
-				log.Debugf("Other event -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
-			}
+		e, ok := <-kt.kbdEvents
+		if !ok {
+			log.Debug("Stopped slurping words")
+			charBuf.Reset()
+			return
 		}
+		switch {
+		case kt.paused:
+			charBuf.Reset()
+		case e.Key.IsKeyPress():
+			log.Debugf("Pressed key -- value: %d code: %d type: %d string: %s rune: %d (%c)", e.Key.Value, e.Key.Code, e.Key.Type, e.AsString, e.AsRune, e.AsRune)
+		case e.Key.IsKeyRelease():
+			log.Debugf("Released key -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
+			switch {
+			case e.AsRune == rune('\b'):
+				if charBuf.Len() > 0 {
+					charBuf.Truncate(charBuf.Len() - 1)
+				}
+			case unicode.IsDigit(e.AsRune) || unicode.IsLetter(e.AsRune):
+				charBuf.WriteRune(e.AsRune)
+			case unicode.IsPunct(e.AsRune) || unicode.IsSymbol(e.AsRune) || unicode.IsSpace(e.AsRune):
+				if charBuf.Len() > 0 {
+					t := &typed{
+						word:  charBuf.String(),
+						punct: e.AsRune,
+					}
+					charBuf.Reset()
+					kt.typedWord <- *t
+				}
+			case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
+				// absorb the ctrl/alt/me	ta key and then reset the buffer
+				<-kt.kbdEvents
+				charBuf.Reset()
+			case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
+			default:
+				charBuf.Reset()
+			}
+		default:
+			log.Debugf("Other event -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
+		}
+
 	}
 }
 
@@ -115,13 +125,12 @@ type typed struct {
 	punct rune
 }
 
-func (kt *KeyTracker) checkWord(socket *control.ControlSocket, stats *wordstats.WordStats) {
+func (kt *KeyTracker) checkWord() {
 
 	for typed := range kt.typedWord {
 		correction := kt.corrections.findCorrection(typed.word)
 		if correction != "" {
-			stats.AddCorrected(typed.word, correction)
-			kt.Pause = true
+			kt.pause()
 			// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
 			// TODO: use an accurate number for the latency
 			time.Sleep(60 * time.Millisecond)
@@ -129,22 +138,24 @@ func (kt *KeyTracker) checkWord(socket *control.ControlSocket, stats *wordstats.
 			// Effectively, hit backspace key for the length of the word plus the punctuation mark.
 			log.Debugf("Making correction %s to %s", typed.word, correction)
 			for i := 0; i <= len(typed.word); i++ {
-				kt.events.TypeBackSpace()
+				kt.kbd.TypeBackSpace()
 			}
 			// Insert the replacement.
 			// Type out the replacement and whatever punctuation/delimiter was after it.
-			kt.events.TypeString(correction + string(typed.punct))
-			if kt.ShowCorrections {
-				notificationData := &control.NotificationData{
-					Title:   "Correction!",
-					Message: fmt.Sprintf("Replaced %s with %s", typed.word, correction),
-				}
-				socket.SendMessage(control.Notification, notificationData)
-			}
-			kt.Pause = false
-		} else {
-			stats.AddChecked(typed.word)
+			kt.kbd.TypeString(correction + string(typed.punct))
+			// if kt.ShowCorrections {
+			// 	notificationData := &control.NotificationData{
+			// 		Title:   "Correction!",
+			// 		Message: fmt.Sprintf("Replaced %s with %s", typed.word, correction),
+			// 	}
+			// }
+			kt.resume()
 		}
+		stats := &control.StatsMsg{
+			Word:       typed.word,
+			Correction: correction,
+		}
+		kt.statsCh <- stats
 	}
 }
 
@@ -157,11 +168,19 @@ func NewKeyTracker() *KeyTracker {
 	ch := make(chan struct{})
 	close(ch)
 	return &KeyTracker{
-		events:          LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
+		kbd:             LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
+		kbdEvents:       make(chan LinuxKeyboard.KeyboardEvent),
 		typedWord:       make(chan typed),
-		Pause:           true,
+		paused:          true,
 		ShowCorrections: false,
 		corrections:     newCorrections(),
+		statsCh:         make(chan *control.StatsMsg),
+	}
+}
+
+func sendStats(manager *control.ConnManager, statsCh chan *control.StatsMsg) {
+	for s := range statsCh {
+		manager.SendStats(s)
 	}
 }
 

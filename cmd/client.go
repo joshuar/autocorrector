@@ -9,6 +9,7 @@ import (
 	"github.com/getlantern/systray"
 	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/icon"
+	"github.com/joshuar/autocorrector/internal/wordstats"
 	homedir "github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -23,7 +24,6 @@ var (
 		Long:  `With the client running, you can pause correction and see notifications.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			systray.Run(onReady, onExit)
-
 		},
 	}
 )
@@ -35,25 +35,35 @@ func init() {
 }
 
 func onReady() {
+	stats := wordstats.OpenWordStats()
 
-	socket := control.NewSocket("")
-	manager := control.NewConnManager()
+	manager := control.NewConnManager("")
 	go manager.Start()
-	go socket.AcceptConnections(manager)
-	socket.SendMessage(control.ResumeServer, nil)
+	log.Debug("Client has started, asking server to resume tracking keys")
+	manager.SendState(&control.StateMsg{Resume: true})
 	go func() {
-		for msg := range socket.Data {
-			switch {
-			case msg.Type == control.Acknowledge:
-				log.Debugf("Got acknowledgement from server: %s", msg.Data.(string))
-			case msg.Type == control.ServerStarted:
-				log.Debug("Server has started")
-				socket.SendMessage(control.ResumeServer, nil)
-			case msg.Type == control.ServerStopped:
-				log.Debug("Server has stopped")
-			case msg.Type == control.Notification:
-				notificationData := msg.Data.(control.NotificationData)
-				beeep.Notify(notificationData.Title, notificationData.Message, "")
+		for msg := range manager.Data {
+			switch t := msg.(type) {
+			case *control.StateMsg:
+				switch {
+				case t.Start:
+					log.Debug("Server has started, asking it to resume tracking keys")
+					manager.SendState(&control.StateMsg{Resume: true})
+				case t.Stop:
+					log.Debug("Server has stopped")
+				// case msg.Type == control.Notification:
+				// 	notificationData := msg.Data.(control.NotificationData)
+				// 	beeep.Notify(notificationData.Title, notificationData.Message, "")
+				default:
+					log.Debugf("Unhandled message recieved: %v", msg)
+				}
+			case *control.StatsMsg:
+				log.Debug("got stats message")
+				if t.Correction != "" {
+					stats.AddCorrected(t.Word, t.Correction)
+				} else {
+					stats.AddChecked(t.Word)
+				}
 			default:
 				log.Debugf("Unhandled message recieved: %v", msg)
 			}
@@ -73,30 +83,34 @@ func onReady() {
 		case <-mEnabled.ClickedCh:
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
-				socket.SendMessage(control.PauseServer, nil)
+				// manager.SendMessage(control.PauseServer, nil)
 				beeep.Notify("Autocorrector disabled", "Temporarily disabling autocorrector", "")
 			} else {
 				mEnabled.Check()
-				socket.SendMessage(control.ResumeServer, nil)
+				// manager.SendMessage(control.ResumeServer, nil)
 				beeep.Notify("Autocorrector enabled", "Re-enabling autocorrector", "")
 
 			}
 		case <-mCorrections.ClickedCh:
 			if mCorrections.Checked() {
 				mCorrections.Uncheck()
-				socket.SendMessage(control.HideNotifications, nil)
+				// manager.SendMessage(control.HideNotifications, nil)
 				beeep.Notify("Hiding Corrections", "Hiding notifications for corrections", "")
 			} else {
 				mCorrections.Check()
-				socket.SendMessage(control.ShowNotifications, nil)
+				// manager.SendMessage(control.ShowNotifications, nil)
 				beeep.Notify("Showing Corrections", "Notifications for corrections will be shown as they are made", "")
 
 			}
 		case <-mQuit.ClickedCh:
 			log.Info("Requesting quit")
+			// manager.SendMessage(control.PauseServer, nil)
 			systray.Quit()
 		case <-mStats.ClickedCh:
-			socket.SendMessage(control.GetStats, nil)
+			beeep.Notify("Current Stats", fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
+				stats.GetCheckedTotal(),
+				stats.GetCorrectedTotal(),
+				stats.CalcAccuracy()), "")
 		}
 	}
 }
