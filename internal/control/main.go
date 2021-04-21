@@ -119,7 +119,6 @@ func (manager *ConnManager) RecieveMessage(connection net.Conn) {
 	var m Msg
 	dec := gob.NewDecoder(connection)
 	if err := dec.Decode(&m); err == nil {
-		log.Debugf("Decoded msg: %v", m)
 		switch {
 		case m.StateMsg != nil:
 			manager.Data <- m.StateMsg
@@ -158,7 +157,6 @@ func (manager *ConnManager) SendMessage(msgData interface{}) {
 				return err
 			}
 		default:
-			log.Debugf("Got %v", t)
 			return fmt.Errorf("unknown data to send: %v", t)
 		}
 		return nil

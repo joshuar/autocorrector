@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	userFlag    string
-	debugFlag   bool
-	profileFlag bool
-	rootCmd     = &cobra.Command{
+	userFlag        string
+	correctionsFlag string
+	debugFlag       bool
+	profileFlag     bool
+	rootCmd         = &cobra.Command{
 		Use:   "autocorrector",
 		Short: "Autocorrect typos and spelling mistakes.",
 		Long:  `Autocorrector is a tool similar to the word replacement functionality in Autokey or AutoHotKey.`,
@@ -49,7 +50,8 @@ func Execute() {
 // init defines flags and configuration settings
 func init() {
 	rootCmd.Flags().StringVar(&userFlag, "user", "", "user to allow access to control socket")
-	rootCmd.MarkPersistentFlagRequired("user")
-	rootCmd.PersistentFlags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
-	rootCmd.PersistentFlags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
+	rootCmd.MarkFlagRequired("user")
+	rootCmd.Flags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
+	rootCmd.Flags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
+	rootCmd.Flags().StringVar(&correctionsFlag, "corrections", "", "list of corrections (default is $HOME/.config/autocorrector/corrections.toml)")
 }

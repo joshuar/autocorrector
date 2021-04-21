@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -17,11 +18,18 @@ import (
 )
 
 var (
-	correctionsFlag string
-	clientCmd       = &cobra.Command{
+	clientCmd = &cobra.Command{
 		Use:   "client",
 		Short: "Client creates tray icon for control and notifications",
 		Long:  `With the client running, you can pause correction and see notifications.`,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if profileFlag {
+				go func() {
+					log.Println(http.ListenAndServe("localhost:6060", nil))
+				}()
+				log.Debug("Profiling is enabled and available at localhost:6060")
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			systray.Run(onReady, onExit)
 		},
@@ -31,7 +39,9 @@ var (
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(clientCmd)
-	rootCmd.Flags().StringVar(&correctionsFlag, "corrections", "", "list of corrections (default is $HOME/.config/autocorrector/corrections.toml)")
+	clientCmd.Flags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
+	clientCmd.Flags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
+
 }
 
 func onReady() {
