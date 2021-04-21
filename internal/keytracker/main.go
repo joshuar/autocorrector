@@ -55,6 +55,7 @@ func (kt *KeyTracker) EventWatcher(manager *control.ConnManager) {
 }
 
 func (kt *KeyTracker) start() error {
+	log.Info("Started checking words")
 	kt.paused = false
 	// kt.kbdEvents = make(chan LinuxKeyboard.KeyboardEvent)
 	// go kt.slurpWords()
@@ -64,6 +65,7 @@ func (kt *KeyTracker) start() error {
 
 func (kt *KeyTracker) pause() error {
 	kt.paused = true
+	log.Info("Pausing checking words...")
 	// close(kt.kbdEvents)
 	return nil
 }

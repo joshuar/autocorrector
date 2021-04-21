@@ -45,12 +45,17 @@ func init() {
 }
 
 func onReady() {
+	notify := newNotificationsHandler()
+	go notify.handleNotifications()
+
 	stats := wordstats.OpenWordStats()
 
 	manager := control.NewConnManager("")
 	go manager.Start()
+
 	log.Debug("Client has started, asking server to resume tracking keys")
 	manager.SendState(&control.StateMsg{Resume: true})
+
 	go func() {
 		for msg := range manager.Data {
 			switch t := msg.(type) {
@@ -61,16 +66,15 @@ func onReady() {
 					manager.SendState(&control.StateMsg{Resume: true})
 				case t.Stop:
 					log.Debug("Server has stopped")
-				// case msg.Type == control.Notification:
-				// 	notificationData := msg.Data.(control.NotificationData)
-				// 	beeep.Notify(notificationData.Title, notificationData.Message, "")
 				default:
 					log.Debugf("Unhandled message recieved: %v", msg)
 				}
 			case *control.StatsMsg:
-				log.Debug("got stats message")
 				if t.Correction != "" {
 					stats.AddCorrected(t.Word, t.Correction)
+					if notify.showCorrections {
+						notify.show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
+					}
 				} else {
 					stats.AddChecked(t.Word)
 				}
@@ -93,34 +97,34 @@ func onReady() {
 		case <-mEnabled.ClickedCh:
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
-				// manager.SendMessage(control.PauseServer, nil)
-				beeep.Notify("Autocorrector disabled", "Temporarily disabling autocorrector", "")
+				manager.SendState(&control.StateMsg{Pause: true})
+				notify.show("Autocorrector disabled", "Temporarily disabling autocorrector")
 			} else {
 				mEnabled.Check()
-				// manager.SendMessage(control.ResumeServer, nil)
-				beeep.Notify("Autocorrector enabled", "Re-enabling autocorrector", "")
+				manager.SendState(&control.StateMsg{Resume: true})
+				notify.show("Autocorrector enabled", "Re-enabling autocorrector")
 
 			}
 		case <-mCorrections.ClickedCh:
 			if mCorrections.Checked() {
 				mCorrections.Uncheck()
-				// manager.SendMessage(control.HideNotifications, nil)
-				beeep.Notify("Hiding Corrections", "Hiding notifications for corrections", "")
+				notify.showCorrections = false
+				notify.show("Hiding Corrections", "Hiding notifications for corrections")
 			} else {
 				mCorrections.Check()
-				// manager.SendMessage(control.ShowNotifications, nil)
-				beeep.Notify("Showing Corrections", "Notifications for corrections will be shown as they are made", "")
+				notify.showCorrections = true
+				notify.show("Showing Corrections", "Notifications for corrections will be shown as they are made")
 
 			}
 		case <-mQuit.ClickedCh:
 			log.Info("Requesting quit")
-			// manager.SendMessage(control.PauseServer, nil)
+			manager.SendState(&control.StateMsg{Pause: true})
 			systray.Quit()
 		case <-mStats.ClickedCh:
-			beeep.Notify("Current Stats", fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
+			notify.show("Current Stats", fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
 				stats.GetCheckedTotal(),
 				stats.GetCorrectedTotal(),
-				stats.CalcAccuracy()), "")
+				stats.CalcAccuracy()))
 		}
 	}
 }
@@ -148,5 +152,34 @@ func initConfig() {
 		var cfgFileDefault = strings.Join([]string{home, "/.config/autocorrector/autocorrector.toml"}, "")
 		viper.SetConfigFile(cfgFileDefault)
 		log.Debug("Using default config file: ", cfgFileDefault)
+	}
+}
+
+type notificationMsg struct {
+	Title, Message string
+}
+type notificationsHandler struct {
+	showCorrections bool
+	notification    chan *notificationMsg
+}
+
+func (nh *notificationsHandler) handleNotifications() {
+	for n := range nh.notification {
+		beeep.Notify(n.Title, n.Message, "")
+	}
+}
+
+func (nh *notificationsHandler) show(title string, message string) {
+	n := &notificationMsg{
+		Title:   title,
+		Message: message,
+	}
+	nh.notification <- n
+}
+
+func newNotificationsHandler() *notificationsHandler {
+	return &notificationsHandler{
+		showCorrections: false,
+		notification:    make(chan *notificationMsg),
 	}
 }
