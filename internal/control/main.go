@@ -16,13 +16,13 @@ type StateMsg struct {
 	Start, Stop, Pause, Resume bool
 }
 
-type StatsMsg struct {
+type WordMsg struct {
 	Word, Correction string
 }
 
 type Msg struct {
 	*StateMsg
-	*StatsMsg
+	*WordMsg
 }
 
 type ControlSocket struct {
@@ -57,8 +57,16 @@ func NewSocketConnection(username string) *ControlSocket {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if err := os.Remove(local); err != nil {
+		log.Fatalf("Could not remove existing socket path: %s (%v)", local, err)
+
+	}
+	l, err := net.Listen("unix", local)
+	if err != nil {
+		log.Fatalf("Unable to listen on socket file %s: %s", local, err)
+	}
 	s := &ControlSocket{
-		localSocket: listen(local),
+		localSocket: l,
 		localPath:   local,
 		remotePath:  remote,
 	}
@@ -72,69 +80,45 @@ func NewSocketConnection(username string) *ControlSocket {
 	return s
 }
 
-func listen(socketPath string) net.Listener {
-	os.Remove(socketPath)
-	name, err := net.Listen("unix", socketPath)
-	if err != nil {
-		log.Fatalf("Unable to listen on socket file %s: %s", socketPath, err)
-	}
-	return name
-}
-
 type ConnManager struct {
-	socket     *ControlSocket
-	register   chan net.Conn
-	unregister chan net.Conn
-	Data       chan interface{}
+	socket *ControlSocket
+	connCh chan net.Conn
+	Data   chan interface{}
 }
 
-func (manager *ConnManager) Start() {
-	go manager.socket.AcceptConnections(manager.register)
-	for {
-		select {
-		case connection := <-manager.register:
-			go manager.RecieveMessage(connection)
-		case connection := <-manager.unregister:
-			connection.Close()
-		}
+func (m *ConnManager) Start() {
+	go m.socket.AcceptConnections(m.connCh)
+	for c := range m.connCh {
+		go m.RecieveMessage(c)
 	}
 }
 
-func NewConnManager(user string) *ConnManager {
-	var s *ControlSocket
-	if user != "" {
-		s = NewSocketConnection(user)
-	} else {
-		s = NewSocketConnection("")
-	}
-	return &ConnManager{
-		socket:     s,
-		Data:       make(chan interface{}),
-		register:   make(chan net.Conn),
-		unregister: make(chan net.Conn),
-	}
-}
-
-func (manager *ConnManager) RecieveMessage(connection net.Conn) {
-	var m Msg
+func (m *ConnManager) RecieveMessage(connection net.Conn) {
+	var rawMsg Msg
 	dec := gob.NewDecoder(connection)
-	if err := dec.Decode(&m); err == nil {
+	if err := dec.Decode(&rawMsg); err == nil {
 		switch {
-		case m.StateMsg != nil:
-			manager.Data <- m.StateMsg
-		case m.StatsMsg != nil:
-			manager.Data <- m.StatsMsg
+		case rawMsg.StateMsg != nil:
+			m.Data <- rawMsg.StateMsg
+		case rawMsg.WordMsg != nil:
+			m.Data <- rawMsg.WordMsg
+		default:
+			log.Errorf("Decoded but unhandled data received: %v", rawMsg)
 		}
 	}
-	manager.unregister <- connection
+	connection.Close()
 }
 
 func (manager *ConnManager) SendState(state *StateMsg) {
 	manager.SendMessage(state)
 }
 
-func (manager *ConnManager) SendStats(stats *StatsMsg) {
-	manager.SendMessage(stats)
+func (manager *ConnManager) SendWord(w string, c string) {
+	t := &WordMsg{
+		Word:       w,
+		Correction: c,
+	}
+	manager.SendMessage(t)
 }
 
 func (manager *ConnManager) SendMessage(msgData interface{}) {
@@ -151,8 +135,8 @@ func (manager *ConnManager) SendMessage(msgData interface{}) {
 				log.Errorf("Write error: %s", err)
 				return err
 			}
-		case *StatsMsg:
-			if err := enc.Encode(&Msg{StatsMsg: t}); err != nil {
+		case *WordMsg:
+			if err := enc.Encode(&Msg{WordMsg: t}); err != nil {
 				log.Errorf("Write error: %s", err)
 				return err
 			}
@@ -164,5 +148,19 @@ func (manager *ConnManager) SendMessage(msgData interface{}) {
 	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
 	if err != nil {
 		log.Errorf("Problem with connection backoff", err)
+	}
+}
+
+func NewConnManager(user string) *ConnManager {
+	var s *ControlSocket
+	if user != "" {
+		s = NewSocketConnection(user)
+	} else {
+		s = NewSocketConnection("")
+	}
+	return &ConnManager{
+		socket: s,
+		Data:   make(chan interface{}),
+		connCh: make(chan net.Conn),
 	}
 }

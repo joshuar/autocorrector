@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
 	"github.com/joshuar/autocorrector/internal/control"
@@ -18,16 +19,34 @@ import (
 )
 
 var (
-	clientCmd = &cobra.Command{
+	correctionsFlag string
+	clientCmd       = &cobra.Command{
 		Use:   "client",
 		Short: "Client creates tray icon for control and notifications",
 		Long:  `With the client running, you can pause correction and see notifications.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if debugFlag {
+				log.SetLevel(log.DebugLevel)
+			}
 			if profileFlag {
 				go func() {
-					log.Println(http.ListenAndServe("localhost:6060", nil))
+					log.Println(http.ListenAndServe("localhost:6061", nil))
 				}()
-				log.Debug("Profiling is enabled and available at localhost:6060")
+				log.Debug("Profiling is enabled and available at localhost:6061")
+			}
+			home, err := homedir.Dir()
+			if err != nil {
+				log.Fatal(fmt.Errorf("fatal finding home directory: %s", err))
+				os.Exit(1)
+			}
+
+			if correctionsFlag != "" {
+				// Use config file from the flag.
+				log.Debug("Using config file specified on command-line: ", correctionsFlag)
+				viper.SetConfigFile(correctionsFlag)
+			} else {
+				var cfgFileDefault = strings.Join([]string{home, "/.config/autocorrector/autocorrector.toml"}, "")
+				viper.SetConfigFile(cfgFileDefault)
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
@@ -37,11 +56,10 @@ var (
 )
 
 func init() {
-	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(clientCmd)
 	clientCmd.Flags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
 	clientCmd.Flags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
-
+	clientCmd.Flags().StringVar(&correctionsFlag, "corrections", "", "list of corrections (default is $HOME/.config/autocorrector/corrections.toml)")
 }
 
 func onReady() {
@@ -49,6 +67,8 @@ func onReady() {
 	go notify.handleNotifications()
 
 	stats := wordstats.OpenWordStats()
+
+	corrections := newCorrections()
 
 	manager := control.NewConnManager("")
 	go manager.Start()
@@ -69,14 +89,15 @@ func onReady() {
 				default:
 					log.Debugf("Unhandled message recieved: %v", msg)
 				}
-			case *control.StatsMsg:
+			case *control.WordMsg:
+				stats.AddChecked(t.Word)
+				t.Correction = corrections.findCorrection(t.Word)
 				if t.Correction != "" {
+					manager.SendWord(t.Word, t.Correction)
 					stats.AddCorrected(t.Word, t.Correction)
 					if notify.showCorrections {
 						notify.show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
 					}
-				} else {
-					stats.AddChecked(t.Word)
 				}
 			default:
 				log.Debugf("Unhandled message recieved: %v", msg)
@@ -132,31 +153,8 @@ func onReady() {
 func onExit() {
 }
 
-// initConfig reads in config file
-func initConfig() {
-	if debugFlag {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	home, err := homedir.Dir()
-	if err != nil {
-		log.Fatal(fmt.Errorf("fatal finding home directory: %s", err))
-		os.Exit(1)
-	}
-
-	if correctionsFlag != "" {
-		// Use config file from the flag.
-		log.Debug("Using config file specified on command-line: ", correctionsFlag)
-		viper.SetConfigFile(correctionsFlag)
-	} else {
-		var cfgFileDefault = strings.Join([]string{home, "/.config/autocorrector/autocorrector.toml"}, "")
-		viper.SetConfigFile(cfgFileDefault)
-		log.Debug("Using default config file: ", cfgFileDefault)
-	}
-}
-
 type notificationMsg struct {
-	Title, Message string
+	title, message string
 }
 type notificationsHandler struct {
 	showCorrections bool
@@ -165,14 +163,14 @@ type notificationsHandler struct {
 
 func (nh *notificationsHandler) handleNotifications() {
 	for n := range nh.notification {
-		beeep.Notify(n.Title, n.Message, "")
+		beeep.Notify(n.title, n.message, "")
 	}
 }
 
-func (nh *notificationsHandler) show(title string, message string) {
+func (nh *notificationsHandler) show(t string, m string) {
 	n := &notificationMsg{
-		Title:   title,
-		Message: message,
+		title:   t,
+		message: m,
 	}
 	nh.notification <- n
 }
@@ -182,4 +180,61 @@ func newNotificationsHandler() *notificationsHandler {
 		showCorrections: false,
 		notification:    make(chan *notificationMsg),
 	}
+}
+
+type corrections struct {
+	correctionList    map[string]string
+	updateCorrections chan bool
+}
+
+func (c *corrections) findCorrection(mispelling string) string {
+	return c.correctionList[mispelling]
+}
+
+func (c *corrections) checkConfig() {
+	// check if any value is also a key
+	// in this case, we'd end up with replacing the typo then replacing the replacement
+	configMap := make(map[string]string)
+	viper.Unmarshal(&configMap)
+	for _, v := range configMap {
+		found := viper.GetString(v)
+		if found != "" {
+			log.Fatalf("A replacement in the config is also listed as a typo (%v)  This won't work.", v)
+		}
+	}
+	log.Debug("Config looks okay.")
+}
+
+func newCorrections() *corrections {
+	log.Debugf("Using corrections config: %s", viper.ConfigFileUsed())
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
+		} else {
+			log.Fatal(fmt.Errorf("fatal error config file: %s", err))
+		}
+	}
+	corrections := &corrections{
+		correctionList:    make(map[string]string),
+		updateCorrections: make(chan bool),
+	}
+	corrections.checkConfig()
+	viper.Unmarshal(&corrections.correctionList)
+	go func() {
+		for {
+			switch {
+			case <-corrections.updateCorrections:
+				corrections.checkConfig()
+				viper.Unmarshal(&corrections.correctionList)
+				log.Debug("Updated corrections from config file.")
+			}
+		}
+
+	}()
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		log.Debug("Config file has changed.")
+		corrections.updateCorrections <- true
+	})
+	viper.WatchConfig()
+	return corrections
 }
