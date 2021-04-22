@@ -2,6 +2,7 @@ package control
 
 import (
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -18,6 +19,7 @@ type StateMsg struct {
 
 type WordMsg struct {
 	Word, Correction string
+	Punct            rune
 }
 
 type Msg struct {
@@ -57,7 +59,7 @@ func NewSocketConnection(username string) *ControlSocket {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Remove(local); err != nil {
+	if err := os.Remove(local); err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Fatalf("Could not remove existing socket path: %s (%v)", local, err)
 
 	}
@@ -113,10 +115,11 @@ func (manager *ConnManager) SendState(state *StateMsg) {
 	manager.SendMessage(state)
 }
 
-func (manager *ConnManager) SendWord(w string, c string) {
+func (manager *ConnManager) SendWord(w string, c string, p rune) {
 	t := &WordMsg{
 		Word:       w,
 		Correction: c,
+		Punct:      p,
 	}
 	manager.SendMessage(t)
 }

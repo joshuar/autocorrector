@@ -93,7 +93,7 @@ func onReady() {
 				stats.AddChecked(t.Word)
 				t.Correction = corrections.findCorrection(t.Word)
 				if t.Correction != "" {
-					manager.SendWord(t.Word, t.Correction)
+					manager.SendWord(t.Word, t.Correction, t.Punct)
 					stats.AddCorrected(t.Word, t.Correction)
 					if notify.showCorrections {
 						notify.show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))

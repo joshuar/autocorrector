@@ -28,9 +28,7 @@ func (kt *KeyTracker) EventWatcher(manager *control.ConnManager) {
 	go kt.kbd.Snoop(kt.kbdEvents)
 	go kt.slurpWords()
 	go kt.correctWords()
-	wordTracker := make(map[string]wordDetails)
 	manager.SendState(&control.StateMsg{Start: true})
-	// for msg := range manager.Data {
 	for {
 		select {
 		case msg := <-manager.Data:
@@ -45,16 +43,13 @@ func (kt *KeyTracker) EventWatcher(manager *control.ConnManager) {
 					kt.resume()
 				}
 			case *control.WordMsg:
-				c := wordTracker[t.Word]
-				c.correction = t.Correction
-				delete(wordTracker, t.Word)
-				kt.wordCorrection <- c
+				w := newWord(t.Word, t.Correction, t.Punct)
+				kt.wordCorrection <- *w
 			default:
 				log.Debugf("Unhandled message recieved: %v", msg)
 			}
 		case w := <-kt.typedWord:
-			wordTracker[w.word] = w
-			manager.SendWord(w.word, "")
+			manager.SendWord(w.word, "", w.punct)
 		}
 	}
 }
@@ -91,30 +86,33 @@ func (kt *KeyTracker) slurpWords() {
 		}
 		switch {
 		case kt.paused:
+			// don't do anything when we aren't tracking keys, just reset the buffer
 			charBuf.Reset()
 		case e.Key.IsKeyPress():
+			// don't act on key presses, just key releases
 			log.Debugf("Pressed key -- value: %d code: %d type: %d string: %s rune: %d (%c)", e.Key.Value, e.Key.Code, e.Key.Type, e.AsString, e.AsRune, e.AsRune)
 		case e.Key.IsKeyRelease():
 			log.Debugf("Released key -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
 			switch {
 			case e.AsRune == rune('\b'):
+				// backspace key
 				if charBuf.Len() > 0 {
 					charBuf.Truncate(charBuf.Len() - 1)
 				}
 			case unicode.IsDigit(e.AsRune) || unicode.IsLetter(e.AsRune):
+				// a letter or number
 				charBuf.WriteRune(e.AsRune)
 			case unicode.IsPunct(e.AsRune) || unicode.IsSymbol(e.AsRune) || unicode.IsSpace(e.AsRune):
+				// a punctuation mark, which would indicate a word has been typed, so handle that
 				if charBuf.Len() > 0 {
-					w := newWord(charBuf.String(), e.AsRune)
+					w := newWord(charBuf.String(), "", e.AsRune)
 					charBuf.Reset()
 					kt.typedWord <- *w
 				}
 			case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
-				// absorb the ctrl/alt/me	ta key and then reset the buffer
-				<-kt.kbdEvents
-				charBuf.Reset()
 			case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
 			default:
+				// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
 				charBuf.Reset()
 			}
 		default:
@@ -149,8 +147,6 @@ func (kt *KeyTracker) CloseKeyTracker() {
 
 // NewKeyTracker creates a new keyTracker struct
 func NewKeyTracker() *KeyTracker {
-	// ch := make(chan struct{})
-	// close(ch)
 	return &KeyTracker{
 		kbd:            LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
 		kbdEvents:      make(chan LinuxKeyboard.KeyboardEvent),
@@ -165,9 +161,10 @@ type wordDetails struct {
 	punct            rune
 }
 
-func newWord(w string, p rune) *wordDetails {
+func newWord(w string, c string, p rune) *wordDetails {
 	return &wordDetails{
-		word:  w,
-		punct: p,
+		word:       w,
+		correction: c,
+		punct:      p,
 	}
 }
