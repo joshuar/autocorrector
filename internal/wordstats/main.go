@@ -48,7 +48,7 @@ func (w *WordStats) AddCorrected(word string, correction string) {
 		return err
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 }
 
@@ -73,7 +73,7 @@ func (w *WordStats) writeAsInt(key string, value uint64) {
 		return err
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 }
 
