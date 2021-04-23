@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
+	"github.com/adrg/xdg"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/mitchellh/go-homedir"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -145,13 +144,13 @@ func decode(blob []byte) *wordAction {
 
 // OpenWordStats creates a new wordStats struct
 func OpenWordStats() *WordStats {
-	home, err := homedir.Dir()
-	if err != nil {
-		log.Fatal(fmt.Errorf("fatal finding home directory: %s", err))
-	}
-
 	// open the on-disk database
-	db, err := bolt.Open(strings.Join([]string{home, "/.config/autocorrector/stats.db"}, ""), 0600, &bolt.Options{Timeout: 1 * time.Second})
+	statsDbFile, err := xdg.DataFile("autocorrector/stats.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Debugf("Using statsdb at %s", statsDbFile)
+	db, err := bolt.Open(statsDbFile, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		log.Fatal(fmt.Errorf("error reading stats database (is autocorrector still running?): %s", err))
 		os.Exit(1)
@@ -169,7 +168,6 @@ func OpenWordStats() *WordStats {
 
 		return nil
 	})
-	log.Debugf("Opened stats database at %s", db.Path())
 	return &WordStats{
 		db: db,
 	}

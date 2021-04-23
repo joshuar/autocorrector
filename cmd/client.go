@@ -3,16 +3,15 @@ package cmd
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"strings"
+	"os/exec"
 
+	"github.com/adrg/xdg"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
 	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/icon"
 	"github.com/joshuar/autocorrector/internal/wordstats"
-	homedir "github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -34,18 +33,14 @@ var (
 				}()
 				log.Debug("Profiling is enabled and available at localhost:6061")
 			}
-			home, err := homedir.Dir()
-			if err != nil {
-				log.Fatal(fmt.Errorf("fatal finding home directory: %s", err))
-				os.Exit(1)
-			}
-
 			if correctionsFlag != "" {
-				// Use config file from the flag.
 				log.Debug("Using config file specified on command-line: ", correctionsFlag)
 				viper.SetConfigFile(correctionsFlag)
 			} else {
-				var cfgFileDefault = strings.Join([]string{home, "/.config/autocorrector/autocorrector.toml"}, "")
+				cfgFileDefault, err := xdg.ConfigFile("autocorrector/corrections.toml")
+				if err != nil {
+					log.Fatal(err)
+				}
 				viper.SetConfigFile(cfgFileDefault)
 			}
 		},
@@ -59,7 +54,7 @@ func init() {
 	rootCmd.AddCommand(clientCmd)
 	clientCmd.Flags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
 	clientCmd.Flags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
-	clientCmd.Flags().StringVar(&correctionsFlag, "corrections", "", "list of corrections (default is $HOME/.config/autocorrector/corrections.toml)")
+	clientCmd.Flags().StringVar(&correctionsFlag, "corrections", "", fmt.Sprintf("list of corrections (default is %s/autocorrector/corrections.toml)", xdg.ConfigHome))
 }
 
 func onReady() {
@@ -109,9 +104,10 @@ func onReady() {
 	systray.SetTitle("Autocorrector")
 	systray.SetTooltip("Autocorrector corrects your typos")
 	mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
-	mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable Autocorrector", true)
+	mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable autocorrector", true)
 	mStats := systray.AddMenuItem("Stats", "Show current stats")
-	mQuit := systray.AddMenuItem("Quit", "Quit Autocorrector")
+	mEdit := systray.AddMenuItem("Edit", "Edit the list of corrections")
+	mQuit := systray.AddMenuItem("Quit", "Quit autocorrector")
 
 	for {
 		select {
@@ -146,6 +142,11 @@ func onReady() {
 				stats.GetCheckedTotal(),
 				stats.GetCorrectedTotal(),
 				stats.CalcAccuracy()))
+		case <-mEdit.ClickedCh:
+			cmd := exec.Command("xdg-open", viper.ConfigFileUsed())
+			if err := cmd.Run(); err != nil {
+				log.Error(err)
+			}
 		}
 	}
 }
@@ -199,14 +200,14 @@ func (c *corrections) checkConfig() {
 	for _, v := range configMap {
 		found := viper.GetString(v)
 		if found != "" {
-			log.Fatalf("A replacement in the config is also listed as a typo (%v)  This won't work.", v)
+			log.Fatalf("A replacement in the config is also listed as a typo (%s)  This won't work.", v)
 		}
 	}
 	log.Debug("Config looks okay.")
 }
 
 func newCorrections() *corrections {
-	log.Debugf("Using corrections config: %s", viper.ConfigFileUsed())
+	log.Debugf("Using corrections config at %s", viper.ConfigFileUsed())
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())

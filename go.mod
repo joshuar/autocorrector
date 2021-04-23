@@ -3,6 +3,7 @@ module github.com/joshuar/autocorrector
 go 1.15
 
 require (
+	github.com/adrg/xdg v0.3.3
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/fsnotify/fsnotify v1.4.9
