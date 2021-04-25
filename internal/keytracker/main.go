@@ -28,19 +28,21 @@ func (kt *KeyTracker) EventWatcher(manager *control.ConnManager) {
 	go kt.kbd.Snoop(kt.kbdEvents)
 	go kt.slurpWords()
 	go kt.correctWords()
-	manager.SendState(&control.StateMsg{Start: true})
+	manager.SendState(control.Start)
 	for {
 		select {
 		case msg := <-manager.Data:
 			switch t := msg.(type) {
 			case *control.StateMsg:
-				switch {
-				case t.Start:
+				switch t.State {
+				case control.Start:
 					kt.start()
-				case t.Pause:
+				case control.Pause:
 					kt.pause()
-				case t.Resume:
+				case control.Resume:
 					kt.resume()
+				default:
+					log.Debugf("Unhandled state: %v", msg)
 				}
 			case *control.WordMsg:
 				w := newWord(t.Word, t.Correction, t.Punct)

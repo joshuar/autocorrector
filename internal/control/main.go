@@ -13,8 +13,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	Start  State = 0x01
+	Resume State = 0x02
+	Pause  State = 0x03
+	Stop   State = 0x04
+)
+
+type State int8
+
 type StateMsg struct {
-	Start, Stop, Pause, Resume bool
+	State
 }
 
 type WordMsg struct {
@@ -111,17 +120,20 @@ func (m *ConnManager) RecieveMessage(connection net.Conn) {
 	connection.Close()
 }
 
-func (manager *ConnManager) SendState(state *StateMsg) {
-	manager.SendMessage(state)
+func (manager *ConnManager) SendState(state State) {
+	s := &StateMsg{
+		State: state,
+	}
+	manager.SendMessage(s)
 }
 
 func (manager *ConnManager) SendWord(w string, c string, p rune) {
-	t := &WordMsg{
+	wm := &WordMsg{
 		Word:       w,
 		Correction: c,
 		Punct:      p,
 	}
-	manager.SendMessage(t)
+	manager.SendMessage(wm)
 }
 
 func (manager *ConnManager) SendMessage(msgData interface{}) {

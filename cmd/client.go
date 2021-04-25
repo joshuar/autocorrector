@@ -69,20 +69,20 @@ func onReady() {
 	go manager.Start()
 
 	log.Debug("Client has started, asking server to resume tracking keys")
-	manager.SendState(&control.StateMsg{Resume: true})
+	manager.SendState(control.Resume)
 
 	go func() {
 		for msg := range manager.Data {
 			switch t := msg.(type) {
 			case *control.StateMsg:
-				switch {
-				case t.Start:
+				switch t.State {
+				case control.Start:
 					log.Debug("Server has started, asking it to resume tracking keys")
-					manager.SendState(&control.StateMsg{Resume: true})
-				case t.Stop:
+					manager.SendState(control.Resume)
+				case control.Stop:
 					log.Debug("Server has stopped")
 				default:
-					log.Debugf("Unhandled message recieved: %v", msg)
+					log.Debugf("Unhandled state: %v", msg)
 				}
 			case *control.WordMsg:
 				stats.AddChecked(t.Word)
@@ -114,11 +114,11 @@ func onReady() {
 		case <-mEnabled.ClickedCh:
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
-				manager.SendState(&control.StateMsg{Pause: true})
+				manager.SendState(control.Pause)
 				notify.show("Autocorrector disabled", "Temporarily disabling autocorrector")
 			} else {
 				mEnabled.Check()
-				manager.SendState(&control.StateMsg{Resume: true})
+				manager.SendState(control.Resume)
 				notify.show("Autocorrector enabled", "Re-enabling autocorrector")
 
 			}
@@ -135,7 +135,7 @@ func onReady() {
 			}
 		case <-mQuit.ClickedCh:
 			log.Info("Requesting quit")
-			manager.SendState(&control.StateMsg{Pause: true})
+			manager.SendState(control.Pause)
 			systray.Quit()
 		case <-mStats.ClickedCh:
 			notify.show("Current Stats", fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
@@ -195,12 +195,12 @@ func (c *corrections) findCorrection(mispelling string) string {
 func (c *corrections) checkConfig() {
 	// check if any value is also a key
 	// in this case, we'd end up with replacing the typo then replacing the replacement
-	configMap := make(map[string]string)
-	viper.Unmarshal(&configMap)
-	for _, v := range configMap {
+	viper.Unmarshal(&c.correctionList)
+	for _, v := range c.correctionList {
 		found := viper.GetString(v)
 		if found != "" {
-			log.Fatalf("A replacement in the config is also listed as a typo (%s)  This won't work.", v)
+			log.Warnf("A replacement (%s) in the config is also listed as a typo. Deleting it to avoid recursive error.", v)
+			delete(c.correctionList, found)
 		}
 	}
 	log.Debug("Config looks okay.")
@@ -220,20 +220,17 @@ func newCorrections() *corrections {
 		updateCorrections: make(chan bool),
 	}
 	corrections.checkConfig()
-	viper.Unmarshal(&corrections.correctionList)
 	go func() {
 		for {
 			switch {
 			case <-corrections.updateCorrections:
 				corrections.checkConfig()
-				viper.Unmarshal(&corrections.correctionList)
-				log.Debug("Updated corrections from config file.")
 			}
 		}
 
 	}()
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Debug("Config file has changed.")
+		log.Debugf("Config file %s has changed, getting updates.", viper.ConfigFileUsed())
 		corrections.updateCorrections <- true
 	})
 	viper.WatchConfig()

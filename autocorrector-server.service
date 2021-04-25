@@ -5,7 +5,7 @@ After=syslog.target
 [Service]
 Type=exec
 RemainAfterExit=yes
-ExecStart=%h/gocode/bin/autocorrector --user <someuser>
+ExecStart=/home/joshua/gocode/bin/autocorrector --user joshua
 
 [Install]
 WantedBy=default.target
