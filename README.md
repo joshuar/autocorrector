@@ -9,8 +9,7 @@ Autocorrector is a tool similar to Autokey or AutoHotKey, but targeted mainly at
 
 Autocorrector reads a TOML configuration file of key-values; the key being the typo and the value being the replacement.  When it detects you have entered a typo, it helpfully corrects it.
 
-The libraries to do the magic replacement are X11 only on Linux. Untested on other OSes.
-
+**This program will only run on Linux**
 ## Made possible with
 
 The following Go libraries and tools made autocorrector infinitely easier:
@@ -35,14 +34,12 @@ Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-error
 
 ## Installation
 
-1. Download and install in your GOPATH:
+1. Install [Mage](https://magefile.org/).
 
-```shell
-go get github.com/joshuar/autocorrector
-cd $GOPATH/src/github.com/joshuar/autocorrector
-go install
-```
+2. Run `mage build` to build the binary and to generate the systemd service files.
 
-2. autocorrector has a client-server model.  Run the server as root (required to read devices from the kernel keyboard device) with `autocorrector --user <yourusername>`.  Run the client with `autocorrector client`.
+3. The program has a client-server model.  The server runs as root (required to read devices from the kernel keyboard device) with `autocorrector --user <yourusername>`.  The client runs as your user with `autocorrector client`. For convienience, there are two systemd service files you can use to start the client and server, which are generated with the build command above.
+  - Copy `autocorrector-server.service` to `/etc/systemd/system`, run `sudo systemctl daemon-reload && systemctl enable autocorrector-server && systemctl start autocorrector-server`.
+  - Copy `autocorrector-client.service` to `~/.config/systemd/user`, run `systemctl --user daemon-reload && systemctl enable autocorrector-client && systemctl start autocorrector-client`.
 
 
