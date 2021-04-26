@@ -29,7 +29,7 @@ var (
 			}
 			if profileFlag {
 				go func() {
-					log.Println(http.ListenAndServe("localhost:6061", nil))
+					log.Debug(http.ListenAndServe("localhost:6061", nil))
 				}()
 				log.Debug("Profiling is enabled and available at localhost:6061")
 			}
@@ -72,81 +72,78 @@ func onReady() {
 	manager.SendState(control.Resume)
 
 	go func() {
-		for msg := range manager.Data {
-			switch t := msg.(type) {
-			case *control.StateMsg:
-				switch t.State {
-				case control.Start:
-					log.Debug("Server has started, asking it to resume tracking keys")
+		systray.SetIcon(icon.Data)
+		systray.SetTitle("Autocorrector")
+		systray.SetTooltip("Autocorrector corrects your typos")
+		mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
+		mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable autocorrector", true)
+		mStats := systray.AddMenuItem("Stats", "Show current stats")
+		mEdit := systray.AddMenuItem("Edit", "Edit the list of corrections")
+		mQuit := systray.AddMenuItem("Quit", "Quit autocorrector")
+
+		for {
+			select {
+			case <-mEnabled.ClickedCh:
+				if mEnabled.Checked() {
+					mEnabled.Uncheck()
+					manager.SendState(control.Pause)
+					notify.show("Autocorrector disabled", "Temporarily disabling autocorrector")
+				} else {
+					mEnabled.Check()
 					manager.SendState(control.Resume)
-				case control.Stop:
-					log.Debug("Server has stopped")
-				default:
-					log.Debugf("Unhandled state: %v", msg)
+					notify.show("Autocorrector enabled", "Re-enabling autocorrector")
+
 				}
-			case *control.WordMsg:
-				stats.AddChecked(t.Word)
-				t.Correction = corrections.findCorrection(t.Word)
-				if t.Correction != "" {
-					manager.SendWord(t.Word, t.Correction, t.Punct)
-					stats.AddCorrected(t.Word, t.Correction)
-					if notify.showCorrections {
-						notify.show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
-					}
+			case <-mCorrections.ClickedCh:
+				if mCorrections.Checked() {
+					mCorrections.Uncheck()
+					notify.showCorrections = false
+					notify.show("Hiding Corrections", "Hiding notifications for corrections")
+				} else {
+					mCorrections.Check()
+					notify.showCorrections = true
+					notify.show("Showing Corrections", "Notifications for corrections will be shown as they are made")
+
 				}
-			default:
-				log.Debugf("Unhandled message recieved: %v", msg)
+			case <-mQuit.ClickedCh:
+				log.Info("Requesting quit")
+				manager.SendState(control.Pause)
+				systray.Quit()
+			case <-mStats.ClickedCh:
+				notify.show("Current Stats", stats.GetStats())
+			case <-mEdit.ClickedCh:
+				cmd := exec.Command("xdg-open", viper.ConfigFileUsed())
+				if err := cmd.Run(); err != nil {
+					log.Error(err)
+				}
 			}
 		}
 	}()
 
-	systray.SetIcon(icon.Data)
-	systray.SetTitle("Autocorrector")
-	systray.SetTooltip("Autocorrector corrects your typos")
-	mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
-	mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable autocorrector", true)
-	mStats := systray.AddMenuItem("Stats", "Show current stats")
-	mEdit := systray.AddMenuItem("Edit", "Edit the list of corrections")
-	mQuit := systray.AddMenuItem("Quit", "Quit autocorrector")
-
-	for {
-		select {
-		case <-mEnabled.ClickedCh:
-			if mEnabled.Checked() {
-				mEnabled.Uncheck()
-				manager.SendState(control.Pause)
-				notify.show("Autocorrector disabled", "Temporarily disabling autocorrector")
-			} else {
-				mEnabled.Check()
+	for msg := range manager.Data {
+		switch t := msg.(type) {
+		case *control.StateMsg:
+			switch t.State {
+			case control.Start:
+				log.Debug("Server has started, asking it to resume tracking keys")
 				manager.SendState(control.Resume)
-				notify.show("Autocorrector enabled", "Re-enabling autocorrector")
-
+			case control.Stop:
+				log.Debug("Server has stopped")
+			default:
+				log.Debugf("Unhandled state: %v", msg)
 			}
-		case <-mCorrections.ClickedCh:
-			if mCorrections.Checked() {
-				mCorrections.Uncheck()
-				notify.showCorrections = false
-				notify.show("Hiding Corrections", "Hiding notifications for corrections")
-			} else {
-				mCorrections.Check()
-				notify.showCorrections = true
-				notify.show("Showing Corrections", "Notifications for corrections will be shown as they are made")
-
+		case *control.WordMsg:
+			stats.AddChecked(t.Word)
+			t.Correction = corrections.findCorrection(t.Word)
+			if t.Correction != "" {
+				manager.SendWord(t.Word, t.Correction, t.Punct)
+				stats.AddCorrected(t.Word, t.Correction)
+				if notify.showCorrections {
+					notify.show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
+				}
 			}
-		case <-mQuit.ClickedCh:
-			log.Info("Requesting quit")
-			manager.SendState(control.Pause)
-			systray.Quit()
-		case <-mStats.ClickedCh:
-			notify.show("Current Stats", fmt.Sprintf("%v words checked.\n%v words corrected.\n%.2f %% accuracy.",
-				stats.GetCheckedTotal(),
-				stats.GetCorrectedTotal(),
-				stats.CalcAccuracy()))
-		case <-mEdit.ClickedCh:
-			cmd := exec.Command("xdg-open", viper.ConfigFileUsed())
-			if err := cmd.Run(); err != nil {
-				log.Error(err)
-			}
+		default:
+			log.Debugf("Unhandled message recieved: %v", msg)
 		}
 	}
 }
@@ -195,6 +192,7 @@ func (c *corrections) findCorrection(mispelling string) string {
 func (c *corrections) checkConfig() {
 	// check if any value is also a key
 	// in this case, we'd end up with replacing the typo then replacing the replacement
+	c.correctionList = make(map[string]string)
 	viper.Unmarshal(&c.correctionList)
 	for _, v := range c.correctionList {
 		found := viper.GetString(v)
@@ -216,7 +214,6 @@ func newCorrections() *corrections {
 		}
 	}
 	corrections := &corrections{
-		correctionList:    make(map[string]string),
 		updateCorrections: make(chan bool),
 	}
 	corrections.checkConfig()

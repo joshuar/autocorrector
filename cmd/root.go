@@ -4,6 +4,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/user"
 
 	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/keytracker"
@@ -20,12 +21,19 @@ var (
 		Short: "Autocorrect typos and spelling mistakes.",
 		Long:  `Autocorrector is a tool similar to the word replacement functionality in Autokey or AutoHotKey.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			currentUser, err := user.Current()
+			if err != nil {
+				log.Fatalf("Could fetch user that ran us: %s", err)
+			}
+			if currentUser.Username != "root" {
+				log.Fatal("autocorrector server must be run as root")
+			}
 			if debugFlag {
 				log.SetLevel(log.DebugLevel)
 			}
 			if profileFlag {
 				go func() {
-					log.Println(http.ListenAndServe("localhost:6060", nil))
+					log.Debug(http.ListenAndServe("localhost:6060", nil))
 				}()
 				log.Debug("Profiling is enabled and available at localhost:6060")
 			}

@@ -99,13 +99,22 @@ func (w *WordStats) CloseWordStats() {
 	w.db.Close()
 }
 
-// ShowStats prints out top-level statistics about corrections
+// ShowStats logs top-level statistics about corrections
 func (w *WordStats) ShowStats() {
 	var statsDetails string
 	statsDetails += fmt.Sprintf("%v words checked. ", w.GetCheckedTotal())
 	statsDetails += fmt.Sprintf("%v words corrected. ", w.GetCorrectedTotal())
 	statsDetails += fmt.Sprintf("Accuracy is: %.2f %%.", w.CalcAccuracy())
 	log.Info(statsDetails)
+}
+
+// GetStats returns top-level statistics about corrections as a formatted string
+func (w *WordStats) GetStats() string {
+	var statsDetails string
+	statsDetails += fmt.Sprintf("%v words checked. ", w.GetCheckedTotal())
+	statsDetails += fmt.Sprintf("%v words corrected. ", w.GetCorrectedTotal())
+	statsDetails += fmt.Sprintf("Accuracy is: %.2f %%.", w.CalcAccuracy())
+	return statsDetails
 }
 
 // ShowLog prints out the full log of corrections history
