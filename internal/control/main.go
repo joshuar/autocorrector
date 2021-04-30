@@ -69,7 +69,7 @@ func NewSocketConnection(username string) *ControlSocket {
 		log.Fatal(err)
 	}
 	if err := os.Remove(local); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Fatalf("Could not remove existing socket path: %s (%v)", local, err)
+		log.Warnf("Could not remove existing socket path: %s (%v)", local, err)
 
 	}
 	l, err := net.Listen("unix", local)
