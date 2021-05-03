@@ -58,6 +58,10 @@ func init() {
 }
 
 func onReady() {
+
+	socket := control.ConnectSocket()
+	go socket.RecvData()
+
 	notify := newNotificationsHandler()
 	go notify.handleNotifications()
 
@@ -65,11 +69,8 @@ func onReady() {
 
 	corrections := newCorrections()
 
-	manager := control.NewConnManager("")
-	go manager.Start()
-
 	log.Debug("Client has started, asking server to resume tracking keys")
-	manager.SendState(control.Resume)
+	socket.SendState(control.Resume)
 
 	go func() {
 		systray.SetIcon(icon.Data)
@@ -86,11 +87,11 @@ func onReady() {
 			case <-mEnabled.ClickedCh:
 				if mEnabled.Checked() {
 					mEnabled.Uncheck()
-					manager.SendState(control.Pause)
+					socket.SendState(control.Pause)
 					notify.show("Autocorrector disabled", "Temporarily disabling autocorrector")
 				} else {
 					mEnabled.Check()
-					manager.SendState(control.Resume)
+					socket.SendState(control.Resume)
 					notify.show("Autocorrector enabled", "Re-enabling autocorrector")
 
 				}
@@ -107,7 +108,7 @@ func onReady() {
 				}
 			case <-mQuit.ClickedCh:
 				log.Info("Requesting quit")
-				manager.SendState(control.Pause)
+				socket.SendState(control.Pause)
 				systray.Quit()
 			case <-mStats.ClickedCh:
 				notify.show("Current Stats", stats.GetStats())
@@ -120,13 +121,13 @@ func onReady() {
 		}
 	}()
 
-	for msg := range manager.Data {
+	for msg := range socket.Data {
 		switch t := msg.(type) {
 		case *control.StateMsg:
 			switch t.State {
 			case control.Start:
 				log.Debug("Server has started, asking it to resume tracking keys")
-				manager.SendState(control.Resume)
+				socket.SendState(control.Resume)
 			case control.Stop:
 				log.Debug("Server has stopped")
 			default:
@@ -136,7 +137,7 @@ func onReady() {
 			stats.AddChecked(t.Word)
 			t.Correction = corrections.findCorrection(t.Word)
 			if t.Correction != "" {
-				manager.SendWord(t.Word, t.Correction, t.Punct)
+				socket.SendWord(t.Word, t.Correction, t.Punct)
 				stats.AddCorrected(t.Word, t.Correction)
 				if notify.showCorrections {
 					notify.show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))

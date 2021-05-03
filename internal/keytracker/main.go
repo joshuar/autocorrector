@@ -5,7 +5,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/go-linuxkeyboard/pkg/LinuxKeyboard"
 
 	log "github.com/sirupsen/logrus"
@@ -17,46 +16,20 @@ import (
 type KeyTracker struct {
 	kbd                       *LinuxKeyboard.LinuxKeyboard
 	kbdEvents                 chan LinuxKeyboard.KeyboardEvent
-	typedWord, wordCorrection chan wordDetails
+	TypedWord, WordCorrection chan wordDetails
 	paused                    bool
 }
 
 // EventWatcher opens the stats database, starts a goroutine to "slurp" words,
 // starts a goroutine to check for corrections and opens a socket for server
 // control
-func (kt *KeyTracker) EventWatcher(manager *control.ConnManager) {
+func (kt *KeyTracker) StartEvents() {
 	go kt.kbd.Snoop(kt.kbdEvents)
 	go kt.slurpWords()
 	go kt.correctWords()
-	manager.SendState(control.Start)
-	for {
-		select {
-		case msg := <-manager.Data:
-			switch t := msg.(type) {
-			case *control.StateMsg:
-				switch t.State {
-				case control.Start:
-					kt.start()
-				case control.Pause:
-					kt.pause()
-				case control.Resume:
-					kt.resume()
-				default:
-					log.Debugf("Unhandled state: %v", msg)
-				}
-			case *control.WordMsg:
-				w := newWord(t.Word, t.Correction, t.Punct)
-				kt.wordCorrection <- *w
-			default:
-				log.Debugf("Unhandled message recieved: %v", msg)
-			}
-		case w := <-kt.typedWord:
-			manager.SendWord(w.word, "", w.punct)
-		}
-	}
 }
 
-func (kt *KeyTracker) start() error {
+func (kt *KeyTracker) Start() error {
 	kt.paused = false
 	// kt.kbdEvents = make(chan LinuxKeyboard.KeyboardEvent)
 	// go kt.slurpWords()
@@ -64,14 +37,14 @@ func (kt *KeyTracker) start() error {
 	return nil
 }
 
-func (kt *KeyTracker) pause() error {
+func (kt *KeyTracker) Pause() error {
 	kt.paused = true
 	// close(kt.kbdEvents)
 	return nil
 }
 
-func (kt *KeyTracker) resume() error {
-	return kt.start()
+func (kt *KeyTracker) Resume() error {
+	return kt.Start()
 }
 
 func (kt *KeyTracker) slurpWords() {
@@ -103,9 +76,9 @@ func (kt *KeyTracker) slurpWords() {
 			case unicode.IsPunct(e.AsRune) || unicode.IsSymbol(e.AsRune) || unicode.IsSpace(e.AsRune):
 				// a punctuation mark, which would indicate a word has been typed, so handle that
 				if charBuf.Len() > 0 {
-					w := newWord(charBuf.String(), "", e.AsRune)
+					w := NewWord(charBuf.String(), "", e.AsRune)
 					charBuf.Reset()
-					kt.typedWord <- *w
+					kt.TypedWord <- *w
 				}
 			case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
 			case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
@@ -121,21 +94,21 @@ func (kt *KeyTracker) slurpWords() {
 }
 
 func (kt *KeyTracker) correctWords() {
-	for w := range kt.wordCorrection {
-		kt.pause()
+	for w := range kt.WordCorrection {
+		kt.Pause()
 		// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
 		// TODO: use an accurate number for the latency
 		time.Sleep(60 * time.Millisecond)
 		// Erase the existing word.
 		// Effectively, hit backspace key for the length of the word plus the punctuation mark.
-		log.Debugf("Making correction %s to %s", w.word, w.correction)
-		for i := 0; i <= len(w.word); i++ {
+		log.Debugf("Making correction %s to %s", w.Word, w.Correction)
+		for i := 0; i <= len(w.Word); i++ {
 			kt.kbd.TypeBackSpace()
 		}
 		// Insert the replacement.
 		// Type out the replacement and whatever punctuation/delimiter was after it.
-		kt.kbd.TypeString(w.correction + string(w.punct))
-		kt.resume()
+		kt.kbd.TypeString(w.Correction + string(w.Punct))
+		kt.Resume()
 	}
 }
 
@@ -148,21 +121,21 @@ func NewKeyTracker() *KeyTracker {
 	return &KeyTracker{
 		kbd:            LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
 		kbdEvents:      make(chan LinuxKeyboard.KeyboardEvent),
-		wordCorrection: make(chan wordDetails),
-		typedWord:      make(chan wordDetails),
+		WordCorrection: make(chan wordDetails),
+		TypedWord:      make(chan wordDetails),
 		paused:         true,
 	}
 }
 
 type wordDetails struct {
-	word, correction string
-	punct            rune
+	Word, Correction string
+	Punct            rune
 }
 
-func newWord(w string, c string, p rune) *wordDetails {
+func NewWord(w string, c string, p rune) *wordDetails {
 	return &wordDetails{
-		word:       w,
-		correction: c,
-		punct:      p,
+		Word:       w,
+		Correction: c,
+		Punct:      p,
 	}
 }

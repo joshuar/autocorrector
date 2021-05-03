@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	Start  State = 0x01
-	Resume State = 0x02
-	Pause  State = 0x03
-	Stop   State = 0x04
+	SocketPath       = "/tmp/autocorrector.sock"
+	Start      State = 0x01
+	Resume     State = 0x02
+	Pause      State = 0x03
+	Stop       State = 0x04
 )
 
 type State int8
@@ -36,114 +37,84 @@ type Msg struct {
 	*WordMsg
 }
 
-type ControlSocket struct {
-	localSocket net.Listener
-	localPath   string
-	remotePath  string
+type Socket struct {
+	addr     *net.UnixAddr
+	listener *net.UnixListener
+	Conn     net.Conn
+	Data     chan interface{}
 }
 
-func (s *ControlSocket) AcceptConnections(r chan net.Conn) {
-	for {
-		conn, err := s.localSocket.Accept()
-		if err != nil {
-			log.Fatalf("Error on accept: %s", err)
-		}
-		r <- conn
+// NewSocket is used by the server command to create a new socket for communication between server and client
+func NewSocket(username string) *Socket {
+	if err := os.Remove(SocketPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Warnf("Could not remove existing socket path: %s (%v)", SocketPath, err)
 	}
-}
-
-func NewSocketConnection(username string) *ControlSocket {
-	var u *user.User
-	var err error
-	var local, remote string
-	if username != "" {
-		u, err = user.Lookup(username)
-		local = "/tmp/autocorrector-" + u.Username + "-server.sock"
-		remote = "/tmp/autocorrector-" + u.Username + "-client.sock"
-	} else {
-		u, err = user.Current()
-		local = "/tmp/autocorrector-" + u.Username + "-client.sock"
-		remote = "/tmp/autocorrector-" + u.Username + "-server.sock"
-	}
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := os.Remove(local); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Warnf("Could not remove existing socket path: %s (%v)", local, err)
-
-	}
-	l, err := net.Listen("unix", local)
-	if err != nil {
-		log.Fatalf("Unable to listen on socket file %s: %s", local, err)
-	}
-	s := &ControlSocket{
-		localSocket: l,
-		localPath:   local,
-		remotePath:  remote,
-	}
-	if username != "" {
-		uid, _ := strconv.Atoi(u.Uid)
-		gid, _ := strconv.Atoi(u.Gid)
-		if err := os.Chown(s.localPath, uid, gid); err != nil {
-			log.Fatalf("Unable to change ownership on socket file %s to %s:%s : %s", s.localPath, 0, gid, err)
-		}
-	}
-	return s
-}
-
-type ConnManager struct {
-	socket *ControlSocket
-	connCh chan net.Conn
-	Data   chan interface{}
-}
-
-func (m *ConnManager) Start() {
-	go m.socket.AcceptConnections(m.connCh)
-	for c := range m.connCh {
-		go m.RecieveMessage(c)
+	addr, err := net.ResolveUnixAddr("unixpacket", SocketPath)
+	checkFatal(err)
+	listener := listenOnSocket(addr, username)
+	conn := acceptOnSocket(listener)
+	return &Socket{
+		addr:     addr,
+		listener: listener,
+		Conn:     conn,
+		Data:     make(chan interface{}),
 	}
 }
 
-func (m *ConnManager) RecieveMessage(connection net.Conn) {
+func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
+	listener, err := net.ListenUnix("unixpacket", addr)
+	checkFatal(err)
+	u, err := user.Lookup(username)
+	checkFatal(err)
+	uid, _ := strconv.Atoi(u.Uid)
+	gid, _ := strconv.Atoi(u.Gid)
+	if err := os.Chown(SocketPath, uid, gid); err != nil {
+		log.Fatalf("Unable to change ownership on socket file %s to %s:%s : %s", SocketPath, 0, gid, err)
+	}
+	return listener
+}
+
+func acceptOnSocket(listener *net.UnixListener) net.Conn {
+	conn, err := listener.Accept()
+	checkFatal(err)
+	return conn
+}
+
+// ConnectSocket is used by the client to connect to the socket the server created for two-way communication
+func ConnectSocket() *Socket {
+	conn, err := net.Dial("unixpacket", SocketPath)
+	checkFatal(err)
+	return &Socket{
+		Conn: conn,
+		Data: make(chan interface{}),
+	}
+}
+
+func (s *Socket) socketRecv() {
 	var rawMsg Msg
-	dec := gob.NewDecoder(connection)
+	dec := gob.NewDecoder(s.Conn)
 	if err := dec.Decode(&rawMsg); err == nil {
 		switch {
 		case rawMsg.StateMsg != nil:
-			m.Data <- rawMsg.StateMsg
+			s.Data <- rawMsg.StateMsg
 		case rawMsg.WordMsg != nil:
-			m.Data <- rawMsg.WordMsg
+			s.Data <- rawMsg.WordMsg
 		default:
 			log.Errorf("Decoded but unhandled data received: %v", rawMsg)
 		}
 	}
-	connection.Close()
 }
 
-func (manager *ConnManager) SendState(state State) {
-	s := &StateMsg{
-		State: state,
+// RecvData handles recieving data on the connection, decoding the message and passing the decoded data to the Data channel (for external processing)
+func (s *Socket) RecvData() {
+	for {
+		s.socketRecv()
 	}
-	manager.SendMessage(s)
 }
 
-func (manager *ConnManager) SendWord(w string, c string, p rune) {
-	wm := &WordMsg{
-		Word:       w,
-		Correction: c,
-		Punct:      p,
-	}
-	manager.SendMessage(wm)
-}
-
-func (manager *ConnManager) SendMessage(msgData interface{}) {
+func (s *Socket) socketSend(msgData interface{}) {
 	tryMessage := func() error {
-		conn, err := net.Dial("unix", manager.socket.remotePath)
-		if err != nil {
-			log.Errorf("Failed to dial: %s", err)
-			return err
-		}
-		enc := gob.NewEncoder(conn)
+		enc := gob.NewEncoder(s.Conn)
 		switch t := msgData.(type) {
 		case *StateMsg:
 			if err := enc.Encode(&Msg{StateMsg: t}); err != nil {
@@ -166,16 +137,26 @@ func (manager *ConnManager) SendMessage(msgData interface{}) {
 	}
 }
 
-func NewConnManager(user string) *ConnManager {
-	var s *ControlSocket
-	if user != "" {
-		s = NewSocketConnection(user)
-	} else {
-		s = NewSocketConnection("")
+// SendState sends a message to the socket of type State
+func (s *Socket) SendState(state State) {
+	msg := &StateMsg{
+		State: state,
 	}
-	return &ConnManager{
-		socket: s,
-		Data:   make(chan interface{}),
-		connCh: make(chan net.Conn),
+	s.socketSend(msg)
+}
+
+// SendState sends a message to the socket of type Word
+func (s *Socket) SendWord(w string, c string, p rune) {
+	msg := &WordMsg{
+		Word:       w,
+		Correction: c,
+		Punct:      p,
+	}
+	s.socketSend(msg)
+}
+
+func checkFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
 	}
 }

@@ -39,11 +39,39 @@ var (
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			manager := control.NewConnManager(userFlag)
-			go manager.Start()
+
+			socket := control.NewSocket(userFlag)
+			go socket.RecvData()
 
 			keyTracker := keytracker.NewKeyTracker()
-			keyTracker.EventWatcher(manager)
+			keyTracker.StartEvents()
+
+			socket.SendState(control.Start)
+			for {
+				select {
+				case msg := <-socket.Data:
+					switch t := msg.(type) {
+					case *control.StateMsg:
+						switch t.State {
+						case control.Start:
+							keyTracker.Start()
+						case control.Pause:
+							keyTracker.Pause()
+						case control.Resume:
+							keyTracker.Resume()
+						default:
+							log.Debugf("Unhandled state: %v", msg)
+						}
+					case *control.WordMsg:
+						w := keytracker.NewWord(t.Word, t.Correction, t.Punct)
+						keyTracker.WordCorrection <- *w
+					default:
+						log.Debugf("Unhandled message recieved: %v", msg)
+					}
+				case w := <-keyTracker.TypedWord:
+					socket.SendWord(w.Word, "", w.Punct)
+				}
+			}
 		},
 	}
 )

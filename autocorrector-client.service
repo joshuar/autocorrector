@@ -6,6 +6,7 @@ After=syslog.target
 Type=exec
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/autocorrector client
+Environment=DISPLAY=:0
 
 [Install]
-WantedBy=default.target
+WantedBy=
