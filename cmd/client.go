@@ -74,7 +74,6 @@ func onReady() {
 
 	go func() {
 		systray.SetIcon(icon.Data)
-		systray.SetTitle("Autocorrector")
 		systray.SetTooltip("Autocorrector corrects your typos")
 		mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
 		mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable autocorrector", true)

@@ -20,9 +20,8 @@ type KeyTracker struct {
 	paused                    bool
 }
 
-// EventWatcher opens the stats database, starts a goroutine to "slurp" words,
-// starts a goroutine to check for corrections and opens a socket for server
-// control
+// StartEvents opens the stats database, starts a goroutine to "slurp" words,
+// starts a goroutine to check for corrections
 func (kt *KeyTracker) StartEvents() {
 	go kt.kbd.Snoop(kt.kbdEvents)
 	go kt.slurpWords()
