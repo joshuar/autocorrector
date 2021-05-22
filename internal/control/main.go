@@ -141,7 +141,6 @@ func (s *Socket) recvEncrypted() {
 // RecvData handles recieving data on the connection, decoding the message and passing the decoded data to the Data channel (for external processing)
 func (s *Socket) RecvData() {
 	for {
-		// s.socketRecv()
 		s.recvEncrypted()
 	}
 }
@@ -187,52 +186,11 @@ func (s *Socket) sendEncrypted(msgData interface{}) {
 
 }
 
-func (s *Socket) socketRecv() {
-	var rawMsg Msg
-	dec := gob.NewDecoder(s.Conn)
-	if err := dec.Decode(&rawMsg); err == nil {
-		switch {
-		case rawMsg.StateMsg != nil:
-			s.Data <- rawMsg.StateMsg
-		case rawMsg.WordMsg != nil:
-			s.Data <- rawMsg.WordMsg
-		default:
-			log.Errorf("Decoded but unhandled data received: %v", rawMsg)
-		}
-	}
-}
-
-func (s *Socket) socketSend(msgData interface{}) {
-	tryMessage := func() error {
-		enc := gob.NewEncoder(s.Conn)
-		switch t := msgData.(type) {
-		case *StateMsg:
-			if err := enc.Encode(&Msg{StateMsg: t}); err != nil {
-				log.Errorf("Write error: %s", err)
-				return err
-			}
-		case *WordMsg:
-			if err := enc.Encode(&Msg{WordMsg: t}); err != nil {
-				log.Errorf("Write error: %s", err)
-				return err
-			}
-		default:
-			return fmt.Errorf("unknown data to send: %v", t)
-		}
-		return nil
-	}
-	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
-	if err != nil {
-		log.Errorf("Problem with connection backoff", err)
-	}
-}
-
 // SendState sends a message to the socket of type State
 func (s *Socket) SendState(state State) {
 	msg := &StateMsg{
 		State: state,
 	}
-	// s.socketSend(msg)
 	s.sendEncrypted(msg)
 }
 
@@ -243,7 +201,6 @@ func (s *Socket) SendWord(w string, c string, p rune) {
 		Correction: c,
 		Punct:      p,
 	}
-	// s.socketSend(msg)
 	s.sendEncrypted(msg)
 }
 
