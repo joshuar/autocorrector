@@ -41,12 +41,13 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 
 			socket := control.NewSocket(userFlag)
+
 			go socket.RecvData()
 
 			keyTracker := keytracker.NewKeyTracker()
 			keyTracker.StartEvents()
 
-			socket.SendState(control.Start)
+			// socket.SendState(control.Start)
 			for {
 				select {
 				case msg := <-socket.Data:

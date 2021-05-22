@@ -29,6 +29,7 @@ func (kt *KeyTracker) StartEvents() {
 }
 
 func (kt *KeyTracker) Start() error {
+	log.Debug("Starting keytracker...")
 	kt.paused = false
 	// kt.kbdEvents = make(chan LinuxKeyboard.KeyboardEvent)
 	// go kt.slurpWords()
@@ -37,12 +38,14 @@ func (kt *KeyTracker) Start() error {
 }
 
 func (kt *KeyTracker) Pause() error {
+	log.Debug("Pausing keytracker...")
 	kt.paused = true
 	// close(kt.kbdEvents)
 	return nil
 }
 
 func (kt *KeyTracker) Resume() error {
+	log.Debug("Resuming keytracker...")
 	return kt.Start()
 }
 

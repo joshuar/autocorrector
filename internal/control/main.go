@@ -42,6 +42,11 @@ type Msg struct {
 	*WordMsg
 }
 
+type Packet struct {
+	EncryptedSize int
+	EncryptedData []byte
+}
+
 type Socket struct {
 	addr      *net.UnixAddr
 	listener  *net.UnixListener
@@ -59,12 +64,16 @@ func NewSocket(username string) *Socket {
 	checkFatal(err)
 	listener := listenOnSocket(addr, username)
 	conn := acceptOnSocket(listener)
-	return &Socket{
+	s := &Socket{
 		addr:     addr,
 		listener: listener,
 		Conn:     conn,
 		Data:     make(chan interface{}),
 	}
+	log.Debug("Socket created.")
+	s.performHandshake()
+
+	return s
 }
 
 func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
@@ -90,10 +99,95 @@ func acceptOnSocket(listener *net.UnixListener) net.Conn {
 func ConnectSocket() *Socket {
 	conn, err := net.Dial("unixpacket", SocketPath)
 	checkFatal(err)
-	return &Socket{
+	s := &Socket{
 		Conn: conn,
 		Data: make(chan interface{}),
 	}
+	log.Debug("Socket connected.")
+	s.performHandshake()
+	return s
+}
+
+func (s *Socket) recvEncrypted() {
+
+	var packet Packet
+	gobDec := gob.NewDecoder(s.Conn)
+	if err := gobDec.Decode(&packet); err != nil {
+		log.Errorf("Read error: %s", err)
+	}
+	var nonce [24]byte
+	copy(nonce[:], packet.EncryptedData[:24])
+	encrypted := packet.EncryptedData[24:packet.EncryptedSize]
+
+	decryptedMsg, ok := box.OpenAfterPrecomputation(nil, encrypted, &nonce, &s.sharedKey)
+	if !ok {
+		log.Error("Failed to decrypt packet")
+	}
+	spew.Dump(decryptedMsg)
+	buf := bytes.NewBuffer(decryptedMsg)
+	var msg Msg
+
+	dec := gob.NewDecoder(buf)
+	if err := dec.Decode(&msg); err == nil {
+		switch {
+		case msg.StateMsg != nil:
+			s.Data <- msg.StateMsg
+		case msg.WordMsg != nil:
+			s.Data <- msg.WordMsg
+		default:
+			log.Errorf("Decoded but unhandled data received: %v", msg)
+		}
+	}
+}
+
+// RecvData handles recieving data on the connection, decoding the message and passing the decoded data to the Data channel (for external processing)
+func (s *Socket) RecvData() {
+	for {
+		// s.socketRecv()
+		s.recvEncrypted()
+	}
+}
+
+func (s *Socket) sendEncrypted(msgData interface{}) {
+	tryMessage := func() error {
+		var msgBuffer bytes.Buffer
+		gobMsg := gob.NewEncoder(&msgBuffer)
+		switch t := msgData.(type) {
+		case *StateMsg:
+			if err := gobMsg.Encode(&Msg{StateMsg: t}); err != nil {
+				log.Errorf("Error encoding message: %s", err)
+				return err
+			}
+		case *WordMsg:
+			if err := gobMsg.Encode(&Msg{WordMsg: t}); err != nil {
+				log.Errorf("Error encoding message: %s", err)
+				return err
+			}
+		default:
+			return fmt.Errorf("unknown data to encode: %v", t)
+		}
+		spew.Dump(msgBuffer.Bytes())
+		var nonce [24]byte
+		if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+			return err
+		}
+		e := box.SealAfterPrecomputation(nonce[:], msgBuffer.Bytes(), &nonce, &s.sharedKey)
+		packet := &Packet{
+			EncryptedSize: len(e),
+			EncryptedData: e,
+		}
+		gobEnc := gob.NewEncoder(s.Conn)
+		if err := gobEnc.Encode(&packet); err != nil {
+			log.Errorf("Write error: %s", err)
+			return err
+		}
+		return nil
+	}
+	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Errorf("Problem with connection backoff", err)
+	}
+
 }
 
 func (s *Socket) socketRecv() {
@@ -108,51 +202,6 @@ func (s *Socket) socketRecv() {
 		default:
 			log.Errorf("Decoded but unhandled data received: %v", rawMsg)
 		}
-	}
-}
-
-func (s *Socket) recvEncrypted() {
-	var rawMsg Msg
-	var decryptedBuffer bytes.Buffer
-	buffer := make([]byte, 2048)
-	n, err := s.Conn.Read(buffer)
-	if err != nil {
-		log.Error(err)
-	}
-	spew.Dump(buffer)
-	log.Debugf("Read %i bytes from connection", n)
-
-	var decryptNonce [24]byte
-	copy(decryptNonce[:], buffer[:24])
-	d, ok := box.OpenAfterPrecomputation(nil, buffer[24:], &decryptNonce, &s.sharedKey)
-	if !ok {
-		log.Error("failed to decrypt error")
-	}
-	n, err = decryptedBuffer.Read(d)
-	if err != nil {
-		log.Error(err)
-	}
-	log.Debug("Decrypted %i bytes", n)
-	dec := gob.NewDecoder(&decryptedBuffer)
-	if err := dec.Decode(&rawMsg); err == nil {
-		switch {
-		case rawMsg.StateMsg != nil:
-			s.Data <- rawMsg.StateMsg
-		case rawMsg.WordMsg != nil:
-			s.Data <- rawMsg.WordMsg
-		default:
-			log.Errorf("Decoded but unhandled data received: %v", rawMsg)
-		}
-	}
-
-}
-
-// RecvData handles recieving data on the connection, decoding the message and passing the decoded data to the Data channel (for external processing)
-func (s *Socket) RecvData() {
-	s.performHandshake()
-	for {
-		// s.socketRecv()
-		s.recvEncrypted()
 	}
 }
 
@@ -181,42 +230,6 @@ func (s *Socket) socketSend(msgData interface{}) {
 	}
 }
 
-func (s *Socket) sendEncrypted(msgData interface{}) {
-	tryMessage := func() error {
-		var nonce [24]byte
-		var b bytes.Buffer
-		enc := gob.NewEncoder(&b)
-		switch t := msgData.(type) {
-		case *StateMsg:
-			if err := enc.Encode(&Msg{StateMsg: t}); err != nil {
-				log.Errorf("Write error: %s", err)
-				return err
-			}
-		case *WordMsg:
-			if err := enc.Encode(&Msg{WordMsg: t}); err != nil {
-				log.Errorf("Write error: %s", err)
-				return err
-			}
-		default:
-			return fmt.Errorf("unknown data to send: %v", t)
-		}
-		if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
-			panic(err)
-		}
-		encrypted := box.SealAfterPrecomputation(nonce[:], b.Bytes(), &nonce, &s.sharedKey)
-		_, err := s.Conn.Write(encrypted)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
-	if err != nil {
-		log.Errorf("Problem with connection backoff", err)
-	}
-
-}
-
 // SendState sends a message to the socket of type State
 func (s *Socket) SendState(state State) {
 	msg := &StateMsg{
@@ -234,13 +247,17 @@ func (s *Socket) SendWord(w string, c string, p rune) {
 		Punct:      p,
 	}
 	// s.socketSend(msg)
+	spew.Dump(msg)
 	s.sendEncrypted(msg)
 }
 
 func (s *Socket) performHandshake() {
+	log.Debug("Performing handshake...")
+
 	var peerKey [32]byte
 
-	publicKey, privateKey, _ := box.GenerateKey(rand.Reader)
+	publicKey, privateKey, err := box.GenerateKey(rand.Reader)
+	checkFatal(err)
 
 	// Deliver the public key
 	s.Conn.Write(publicKey[:])
@@ -248,10 +265,10 @@ func (s *Socket) performHandshake() {
 	// Receive the peer key
 	peerKeyArray := make([]byte, 32)
 	s.Conn.Read(peerKeyArray)
-
 	copy(peerKey[:], peerKeyArray)
 
 	box.Precompute(&s.sharedKey, &peerKey, privateKey)
+	log.Debug("Handshake complete...")
 }
 
 func checkFatal(err error) {
