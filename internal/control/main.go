@@ -13,7 +13,6 @@ import (
 	"strconv"
 
 	"github.com/cenkalti/backoff"
-	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -123,7 +122,6 @@ func (s *Socket) recvEncrypted() {
 	if !ok {
 		log.Error("Failed to decrypt packet")
 	}
-	spew.Dump(decryptedMsg)
 	buf := bytes.NewBuffer(decryptedMsg)
 	var msg Msg
 
@@ -166,7 +164,6 @@ func (s *Socket) sendEncrypted(msgData interface{}) {
 		default:
 			return fmt.Errorf("unknown data to encode: %v", t)
 		}
-		spew.Dump(msgBuffer.Bytes())
 		var nonce [24]byte
 		if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 			return err
@@ -247,7 +244,6 @@ func (s *Socket) SendWord(w string, c string, p rune) {
 		Punct:      p,
 	}
 	// s.socketSend(msg)
-	spew.Dump(msg)
 	s.sendEncrypted(msg)
 }
 
