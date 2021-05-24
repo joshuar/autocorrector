@@ -61,6 +61,7 @@ func NewSocket(username string) *Socket {
 	}
 	addr, err := net.ResolveUnixAddr("unixpacket", SocketPath)
 	checkFatal(err)
+	log.Debug("Creating socket and waiting for client connection...")
 	listener := listenOnSocket(addr, username)
 	conn := acceptOnSocket(listener)
 	s := &Socket{
@@ -112,7 +113,7 @@ func (s *Socket) recvEncrypted() {
 	var packet Packet
 	gobDec := gob.NewDecoder(s.Conn)
 	if err := gobDec.Decode(&packet); err != nil {
-		log.Errorf("Read error: %s", err)
+		log.Fatalf("Read error: %s", err)
 	}
 	var nonce [24]byte
 	copy(nonce[:], packet.EncryptedData[:24])

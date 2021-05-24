@@ -34,12 +34,12 @@ Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-error
 
 ## Installation
 
-1. Install [Mage](https://magefile.org/).
-
-2. Run `mage build` to build the binary and to generate the systemd service files.
-
-3. The program has a client-server model.  The server runs as root (required to read devices from the kernel keyboard device) with `autocorrector --user <yourusername>`.  The client runs as your user with `autocorrector client`. For convienience, there are two systemd service files you can use to start the client and server, which are generated with the build command above.
-  - Copy `autocorrector-server.service` to `/etc/systemd/system`, run `sudo systemctl daemon-reload && systemctl enable autocorrector-server && systemctl start autocorrector-server`.
-  - Copy `autocorrector-client.service` to `~/.config/systemd/user`, run `systemctl --user daemon-reload && systemctl enable autocorrector-client && systemctl start autocorrector-client`.
-
-
+1. Download the latest release in an appropriate format.
+2. Copy the files to the appropriate locations:
+  - `autocorrector-server.service` :arrow_forward: `/etc/systemd/system/autocorrector-server.service` (done automatically for deb/rpm packages)
+  - `autocorrector-client.service` :arrow_forward: `$HOME/.config/systemd/user/autocorrector-client.service`
+  - corrections.toml :arrow_forward: `$HOME/.config/autocorrector/corrections.toml`
+3. Reload systemd and enable/start the services:
+  - `sudo systemctl daemon-reload && systemctl --user daemon-reload`
+  - `sudo systemctl enable autocorrector-server && sudo systemctl start autocorrector-server`
+  - `systemctl --user enable autocorrector-client && systemctl start autocorrector-client`

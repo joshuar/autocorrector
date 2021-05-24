@@ -46,7 +46,8 @@ func (kt *KeyTracker) Pause() error {
 
 func (kt *KeyTracker) Resume() error {
 	log.Debug("Resuming keytracker...")
-	return kt.Start()
+	kt.paused = false
+	return nil
 }
 
 func (kt *KeyTracker) slurpWords() {

@@ -1,12 +1,10 @@
 [Unit]
-Description=Autocorrector Service
-Requires=plasma-plasmashell.service
-After=plasma-plasmashell.service
+Description=Autocorrector Client
 
 [Service]
 Type=exec
 RemainAfterExit=yes
-ExecStart=%h/gocode/bin/autocorrector client --profile
+ExecStart=/usr/local/bin/autocorrector client
 
 [Install]
 WantedBy=default.target

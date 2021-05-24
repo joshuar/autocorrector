@@ -1,0 +1,58 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+nfpms:
+  - id: github.com/joshuar/autocorrector
+    package_name: autocorrector
+    replacements:
+      amd64: 64-bit
+      linux: Tux
+    vendor: joshuar
+    homepage: https://github.com/joshuar/autocorrector
+    maintainer: Joshua Rich <joshua.rich@gmail.com>
+    description: Autocorrector is a tool similar to Autokey or AutoHotKey, but targeted mainly at word replacements.
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+    dependencies:
+      - libappindicator-gtk3
+    contents:
+      - src: autocorrector-server.service
+        dst: /etc/systemd/system/autocorrector-server.service
+      - src: autocorrector-client.service
+        dst: /usr/local/share/autocorrector/autocorrector-client.service
+      - src: LICENSE
+        dst: /usr/local/share/autocorrector/LICENSE
+      - src: README.md
+        dst: /usr/local/share/autocorrector/README.md
+      - src: corrections.toml
+        dst: /usr/local/share/autocorrector/corrections.toml
+archives:
+  - replacements:
+      linux: Linux
+      amd64: x86_64
+    files:
+      - LICENSE
+      - README.md
+      - corrections.toml
+      - autocorrector-client.service
+      - autocorrector-server.service
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
