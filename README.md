@@ -36,9 +36,9 @@ Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-error
 
 1. Download the latest release in an appropriate format.
 2. Copy the files to the appropriate locations:
-  - `autocorrector-server.service` :arrow_forward: `/etc/systemd/system/autocorrector-server.service` (done automatically for deb/rpm packages)
-  - `autocorrector-client.service` :arrow_forward: `$HOME/.config/systemd/user/autocorrector-client.service`
-  - corrections.toml :arrow_forward: `$HOME/.config/autocorrector/corrections.toml`
+  - `autocorrector-server.service` -> `/usr/lib/systemd/system/autocorrector-server.service` (done automatically for deb/rpm packages)
+  - `autocorrector-client.service` -> `$HOME/.config/systemd/user/autocorrector-client.service`
+  - corrections.toml -> `$HOME/.config/autocorrector/corrections.toml`
 3. Reload systemd and enable/start the services:
   - `sudo systemctl daemon-reload && systemctl --user daemon-reload`
   - `sudo systemctl enable autocorrector-server && sudo systemctl start autocorrector-server`

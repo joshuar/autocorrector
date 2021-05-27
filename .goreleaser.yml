@@ -14,7 +14,7 @@ nfpms:
     package_name: autocorrector
     replacements:
       amd64: 64-bit
-      linux: Tux
+      linux: Linux
     vendor: joshuar
     homepage: https://github.com/joshuar/autocorrector
     maintainer: Joshua Rich <joshua.rich@gmail.com>
@@ -27,7 +27,7 @@ nfpms:
       - libappindicator-gtk3
     contents:
       - src: autocorrector-server.service
-        dst: /etc/systemd/system/autocorrector-server.service
+        dst: /usr/lib/systemd/system/autocorrector-server.service
       - src: autocorrector-client.service
         dst: /usr/local/share/autocorrector/autocorrector-client.service
       - src: LICENSE
