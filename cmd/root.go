@@ -4,6 +4,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/exec"
 	"os/user"
 
 	"github.com/joshuar/autocorrector/internal/control"
@@ -75,6 +76,24 @@ var (
 			}
 		},
 	}
+	enableCmd = &cobra.Command{
+		Use:   "enable [username]",
+		Short: "Enable the autocorrector service for the specified user",
+		Long:  "Copies and enables an autocorrector systemd service for the specified user",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			systemdReload := exec.Command("systemctl", "daemon-reload")
+			err := systemdReload.Run()
+			if err != nil {
+				log.Warn(err)
+			}
+			systemdEnable := exec.Command("systemctl", "enable", "autocorrector@"+args[0])
+			err = systemdEnable.Run()
+			if err != nil {
+				log.Warn(err)
+			}
+		},
+	}
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -92,4 +111,5 @@ func init() {
 	rootCmd.MarkFlagRequired("user")
 	rootCmd.Flags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
 	rootCmd.Flags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
+	rootCmd.AddCommand(enableCmd)
 }

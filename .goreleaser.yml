@@ -26,16 +26,18 @@ nfpms:
     dependencies:
       - libappindicator-gtk3
     contents:
-      - src: autocorrector-server.service
-        dst: /usr/lib/systemd/system/autocorrector-server.service
-      - src: autocorrector-client.service
-        dst: /usr/local/share/autocorrector/autocorrector-client.service
+      - src: init/autocorrector@.service
+        dst: /usr/lib/systemd/system/autocorrector@.service
       - src: LICENSE
         dst: /usr/local/share/autocorrector/LICENSE
       - src: README.md
         dst: /usr/local/share/autocorrector/README.md
-      - src: corrections.toml
+      - src: configs/corrections.toml
         dst: /usr/local/share/autocorrector/corrections.toml
+      - src: assets/icon/autocorrector.png
+        dst: /usr/local/share/pixmaps/autocorrector.png
+      - src: assets/autocorrector.desktop
+        dst: /usr/local/share/applications/autocorrector.desktop
 archives:
   - replacements:
       linux: Linux
@@ -43,9 +45,9 @@ archives:
     files:
       - LICENSE
       - README.md
-      - corrections.toml
-      - autocorrector-client.service
-      - autocorrector-server.service
+      - configs/corrections.toml
+      - init/autocorrector@.service
+      - assets/icon/autocorrector.png
 checksum:
   name_template: 'checksums.txt'
 snapshot:

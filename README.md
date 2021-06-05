@@ -32,14 +32,13 @@ Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-error
 ## Requirements
 - Golang
 
-## Installation
+## Installation (for rpm/deb)
 
-1. Download the latest release in an appropriate format.
-2. Copy the files to the appropriate locations:
-  - `autocorrector-server.service` -> `/usr/lib/systemd/system/autocorrector-server.service` (done automatically for deb/rpm packages)
-  - `autocorrector-client.service` -> `$HOME/.config/systemd/user/autocorrector-client.service`
-  - corrections.toml -> `$HOME/.config/autocorrector/corrections.toml`
-3. Reload systemd and enable/start the services:
-  - `sudo systemctl daemon-reload && systemctl --user daemon-reload`
-  - `sudo systemctl enable autocorrector-server && sudo systemctl start autocorrector-server`
-  - `systemctl --user enable autocorrector-client && systemctl start autocorrector-client`
+1. Download either the `.rpm` or `.deb` file and install using your package manager.
+2. Set-up the client by running `autocorrector client setup` as your user.
+  - This will create `$HOME/.config/autocorrector/corrections.toml` (using the default corrections file).
+  - An autostart entry will be created in `~/.config/autostart`.
+3. Set-up the server by running `sudo autocorrector enable $USERNAME` (substitute `$USERNAME` for your username).
+  - This will enable a service, `autocorrector@USERNAME` for the specified user.
+4. Start the service with `systemctl start autocorrector@USERNAME`.
+5. Run `autocorrector client` or use the **autocorrector** menu entry in your desktop environment.

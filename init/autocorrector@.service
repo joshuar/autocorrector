@@ -7,7 +7,7 @@ Type=exec
 RemainAfterExit=yes
 Restart=on-abnormal
 PrivateNetwork=yes
-ExecStart=/usr/local/bin/autocorrector --user {{.User}}
+ExecStart=/usr/local/bin/autocorrector --user %i
 
 [Install]
 WantedBy=graphical.target

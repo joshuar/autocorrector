@@ -2,15 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 
 	"github.com/adrg/xdg"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gen2brain/beeep"
 	"github.com/getlantern/systray"
+	"github.com/joshuar/autocorrector/assets/icon"
 	"github.com/joshuar/autocorrector/internal/control"
-	"github.com/joshuar/autocorrector/internal/icon"
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -37,15 +39,37 @@ var (
 				log.Debug("Using config file specified on command-line: ", correctionsFlag)
 				viper.SetConfigFile(correctionsFlag)
 			} else {
-				cfgFileDefault, err := xdg.ConfigFile("autocorrector/corrections.toml")
-				if err != nil {
-					log.Fatal(err)
-				}
-				viper.SetConfigFile(cfgFileDefault)
+				viper.SetConfigName("corrections")
+				viper.SetConfigType("toml")
+				viper.AddConfigPath("/usr/local/share/autocorrector")
+				viper.AddConfigPath(xdg.ConfigHome + "/autocorrector")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			systray.Run(onReady, onExit)
+		},
+	}
+	clientSetupCmd = &cobra.Command{
+		Use:   "setup",
+		Short: "Set-up an autocorrector client",
+		Long:  "The client set-up command will make a copy of the default corrections file and create an autostart entry for the current user",
+		Run: func(cmd *cobra.Command, args []string) {
+			err := os.Mkdir(xdg.ConfigHome+"/autocorrector", 0755)
+			if err != nil {
+				log.Warn(err)
+			}
+			defaultCorrections, err := ioutil.ReadFile("/usr/local/share/autocorrector/corrections.toml")
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = ioutil.WriteFile(xdg.ConfigHome+"/autocorrector/corrections.toml", defaultCorrections, 0755)
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = os.Symlink("/usr/local/share/applications/autocorrector.desktop", xdg.ConfigHome+"/autostart/autocorrector.desktop")
+			if err != nil {
+				log.Fatal(err)
+			}
 		},
 	}
 )
@@ -55,6 +79,7 @@ func init() {
 	clientCmd.Flags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
 	clientCmd.Flags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
 	clientCmd.Flags().StringVar(&correctionsFlag, "corrections", "", fmt.Sprintf("list of corrections (default is %s/autocorrector/corrections.toml)", xdg.ConfigHome))
+	clientCmd.AddCommand(clientSetupCmd)
 }
 
 func onReady() {
