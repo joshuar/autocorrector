@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"syscall"
 
 	"github.com/adrg/xdg"
 	"github.com/fsnotify/fsnotify"
@@ -55,8 +56,10 @@ var (
 		Long:  "The client set-up command will make a copy of the default corrections file and create an autostart entry for the current user",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := os.Mkdir(xdg.ConfigHome+"/autocorrector", 0755)
-			if err != nil {
+			if e, ok := err.(*os.PathError); ok && e.Err == syscall.EEXIST {
 				log.Warn(err)
+			} else {
+				log.Fatal(err)
 			}
 			defaultCorrections, err := ioutil.ReadFile("/usr/local/share/autocorrector/corrections.toml")
 			if err != nil {
@@ -67,7 +70,9 @@ var (
 				log.Fatal(err)
 			}
 			err = os.Symlink("/usr/local/share/applications/autocorrector.desktop", xdg.ConfigHome+"/autostart/autocorrector.desktop")
-			if err != nil {
+			if e, ok := err.(*os.LinkError); ok && e.Err == syscall.EEXIST {
+				log.Warn(err)
+			} else {
 				log.Fatal(err)
 			}
 		},

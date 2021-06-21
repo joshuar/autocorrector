@@ -86,11 +86,13 @@ var (
 			err := systemdReload.Run()
 			if err != nil {
 				log.Warn(err)
+				log.Warnf("Try manually running the following command and fix any errors it returns: %s", systemdReload.String())
 			}
 			systemdEnable := exec.Command("systemctl", "enable", "autocorrector@"+args[0])
 			err = systemdEnable.Run()
 			if err != nil {
 				log.Warn(err)
+				log.Warnf("Try manually running the following command and fix any errors it returns: %s", systemdEnable.String())
 			}
 		},
 	}

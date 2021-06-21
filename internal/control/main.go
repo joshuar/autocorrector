@@ -97,14 +97,24 @@ func acceptOnSocket(listener *net.UnixListener) net.Conn {
 
 // ConnectSocket is used by the client to connect to the socket the server created for two-way communication
 func ConnectSocket() *Socket {
-	conn, err := net.Dial("unixpacket", SocketPath)
-	checkFatal(err)
-	s := &Socket{
-		Conn: conn,
-		Data: make(chan interface{}),
+	var s *Socket
+	tryMessage := func() error {
+		conn, err := net.Dial("unixpacket", SocketPath)
+		if err != nil {
+			return err
+		}
+		s = &Socket{
+			Conn: conn,
+			Data: make(chan interface{}),
+		}
+		log.Debug("Socket connected.")
+		s.performHandshake()
+		return nil
 	}
-	log.Debug("Socket connected.")
-	s.performHandshake()
+	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Errorf("Problem with connection backoff", err)
+	}
 	return s
 }
 
@@ -121,7 +131,7 @@ func (s *Socket) recvEncrypted() {
 
 	decryptedMsg, ok := box.OpenAfterPrecomputation(nil, encrypted, &nonce, &s.sharedKey)
 	if !ok {
-		log.Error("Failed to decrypt packet")
+		log.Warn("Failed to decrypt packet")
 	}
 	buf := bytes.NewBuffer(decryptedMsg)
 	var msg Msg
@@ -134,7 +144,7 @@ func (s *Socket) recvEncrypted() {
 		case msg.WordMsg != nil:
 			s.Data <- msg.WordMsg
 		default:
-			log.Errorf("Decoded but unhandled data received: %v", msg)
+			log.Warnf("Decoded but unhandled data received: %v", msg)
 		}
 	}
 }
@@ -184,7 +194,6 @@ func (s *Socket) sendEncrypted(msgData interface{}) {
 	if err != nil {
 		log.Errorf("Problem with connection backoff", err)
 	}
-
 }
 
 // SendState sends a message to the socket of type State
