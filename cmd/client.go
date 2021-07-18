@@ -42,8 +42,8 @@ var (
 			} else {
 				viper.SetConfigName("corrections")
 				viper.SetConfigType("toml")
-				viper.AddConfigPath("/usr/local/share/autocorrector")
 				viper.AddConfigPath(xdg.ConfigHome + "/autocorrector")
+				viper.AddConfigPath("/usr/local/share/autocorrector")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
@@ -235,7 +235,6 @@ func (c *corrections) checkConfig() {
 }
 
 func newCorrections() *corrections {
-	log.Debugf("Using corrections config at %s", viper.ConfigFileUsed())
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
@@ -243,6 +242,7 @@ func newCorrections() *corrections {
 			log.Fatal(fmt.Errorf("fatal error config file: %s", err))
 		}
 	}
+	log.Debugf("Using corrections config at %s", viper.ConfigFileUsed())
 	corrections := &corrections{
 		updateCorrections: make(chan bool),
 	}
