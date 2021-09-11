@@ -48,10 +48,11 @@ type Packet struct {
 
 type Socket struct {
 	addr      *net.UnixAddr
-	listener  *net.UnixListener
+	Listener  *net.UnixListener
 	sharedKey [32]byte
 	Conn      net.Conn
 	Data      chan interface{}
+	Done      chan bool
 }
 
 // NewSocket is used by the server command to create a new socket for communication between server and client
@@ -63,12 +64,13 @@ func NewSocket(username string) *Socket {
 	checkFatal(err)
 	log.Debug("Creating socket and waiting for client connection...")
 	listener := listenOnSocket(addr, username)
-	conn := acceptOnSocket(listener)
+	conn := AcceptOnSocket(listener)
 	s := &Socket{
 		addr:     addr,
-		listener: listener,
+		Listener: listener,
 		Conn:     conn,
 		Data:     make(chan interface{}),
+		Done:     make(chan bool),
 	}
 	log.Debug("Socket created.")
 	s.performHandshake()
@@ -89,7 +91,7 @@ func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
 	return listener
 }
 
-func acceptOnSocket(listener *net.UnixListener) net.Conn {
+func AcceptOnSocket(listener *net.UnixListener) net.Conn {
 	conn, err := listener.Accept()
 	checkFatal(err)
 	return conn
@@ -118,12 +120,13 @@ func ConnectSocket() *Socket {
 	return s
 }
 
-func (s *Socket) recvEncrypted() {
+func (s *Socket) recvEncrypted() int {
 
 	var packet Packet
 	gobDec := gob.NewDecoder(s.Conn)
 	if err := gobDec.Decode(&packet); err != nil {
-		log.Fatalf("Read error: %s", err)
+		log.Errorf("Read error: %s", err)
+		return 1
 	}
 	var nonce [24]byte
 	copy(nonce[:], packet.EncryptedData[:24])
@@ -147,12 +150,16 @@ func (s *Socket) recvEncrypted() {
 			log.Warnf("Decoded but unhandled data received: %v", msg)
 		}
 	}
+	return 0
 }
 
 // RecvData handles recieving data on the connection, decoding the message and passing the decoded data to the Data channel (for external processing)
 func (s *Socket) RecvData() {
 	for {
-		s.recvEncrypted()
+		if rv := s.recvEncrypted(); rv != 0 {
+			s.Done <- true
+			break
+		}
 	}
 }
 
