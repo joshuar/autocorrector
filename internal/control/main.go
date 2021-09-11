@@ -120,45 +120,39 @@ func ConnectSocket() *Socket {
 	return s
 }
 
-func (s *Socket) recvEncrypted() int {
-
-	var packet Packet
-	gobDec := gob.NewDecoder(s.Conn)
-	if err := gobDec.Decode(&packet); err != nil {
-		log.Errorf("Read error: %s", err)
-		return 1
-	}
-	var nonce [24]byte
-	copy(nonce[:], packet.EncryptedData[:24])
-	encrypted := packet.EncryptedData[24:packet.EncryptedSize]
-
-	decryptedMsg, ok := box.OpenAfterPrecomputation(nil, encrypted, &nonce, &s.sharedKey)
-	if !ok {
-		log.Warn("Failed to decrypt packet")
-	}
-	buf := bytes.NewBuffer(decryptedMsg)
-	var msg Msg
-
-	dec := gob.NewDecoder(buf)
-	if err := dec.Decode(&msg); err == nil {
-		switch {
-		case msg.StateMsg != nil:
-			s.Data <- msg.StateMsg
-		case msg.WordMsg != nil:
-			s.Data <- msg.WordMsg
-		default:
-			log.Warnf("Decoded but unhandled data received: %v", msg)
-		}
-	}
-	return 0
-}
-
 // RecvData handles recieving data on the connection, decoding the message and passing the decoded data to the Data channel (for external processing)
 func (s *Socket) RecvData() {
 	for {
-		if rv := s.recvEncrypted(); rv != 0 {
-			s.Done <- true
-			break
+		var packet Packet
+		gobDec := gob.NewDecoder(s.Conn)
+		if err := gobDec.Decode(&packet); err != nil {
+			log.Errorf("Read error: %s", err)
+			if err == io.EOF {
+				s.Done <- true
+				break
+			}
+		}
+		var nonce [24]byte
+		copy(nonce[:], packet.EncryptedData[:24])
+		encrypted := packet.EncryptedData[24:packet.EncryptedSize]
+
+		decryptedMsg, ok := box.OpenAfterPrecomputation(nil, encrypted, &nonce, &s.sharedKey)
+		if !ok {
+			log.Warn("Failed to decrypt packet")
+		}
+		buf := bytes.NewBuffer(decryptedMsg)
+		var msg Msg
+
+		dec := gob.NewDecoder(buf)
+		if err := dec.Decode(&msg); err == nil {
+			switch {
+			case msg.StateMsg != nil:
+				s.Data <- msg.StateMsg
+			case msg.WordMsg != nil:
+				s.Data <- msg.WordMsg
+			default:
+				log.Warnf("Decoded but unhandled data received: %v", msg)
+			}
 		}
 	}
 }

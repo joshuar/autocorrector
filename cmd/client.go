@@ -178,6 +178,54 @@ func onReady() {
 	}
 }
 
+func handleTrayIcon(s *control.Socket, n *notificationsHandler, st *wordstats.WordStats) {
+	systray.SetIcon(icon.Data)
+	systray.SetTooltip("Autocorrector corrects your typos")
+	mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
+	mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable autocorrector", true)
+	mStats := systray.AddMenuItem("Stats", "Show current stats")
+	mEdit := systray.AddMenuItem("Edit", "Edit the list of corrections")
+	mQuit := systray.AddMenuItem("Quit", "Quit autocorrector")
+
+	for {
+		select {
+		case <-mEnabled.ClickedCh:
+			if mEnabled.Checked() {
+				mEnabled.Uncheck()
+				s.SendState(control.Pause)
+				n.show("Autocorrector disabled", "Temporarily disabling autocorrector")
+			} else {
+				mEnabled.Check()
+				s.SendState(control.Resume)
+				n.show("Autocorrector enabled", "Re-enabling autocorrector")
+
+			}
+		case <-mCorrections.ClickedCh:
+			if mCorrections.Checked() {
+				mCorrections.Uncheck()
+				n.showCorrections = false
+				n.show("Hiding Corrections", "Hiding notifications for corrections")
+			} else {
+				mCorrections.Check()
+				n.showCorrections = true
+				n.show("Showing Corrections", "Notifications for corrections will be shown as they are made")
+
+			}
+		case <-mQuit.ClickedCh:
+			log.Info("Requesting quit")
+			s.SendState(control.Pause)
+			systray.Quit()
+		case <-mStats.ClickedCh:
+			n.show("Current Stats", st.GetStats())
+		case <-mEdit.ClickedCh:
+			cmd := exec.Command("xdg-open", viper.ConfigFileUsed())
+			if err := cmd.Run(); err != nil {
+				log.Error(err)
+			}
+		}
+	}
+}
+
 func onExit() {
 }
 

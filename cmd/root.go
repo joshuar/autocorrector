@@ -52,7 +52,6 @@ var (
 				// socket.SendState(control.Start)
 				for {
 					select {
-
 					case msg := <-socket.Data:
 						switch t := msg.(type) {
 						case *control.StateMsg:
@@ -73,7 +72,7 @@ var (
 							log.Debugf("Unhandled message recieved: %v", msg)
 						}
 					case <-socket.Done:
-						log.Debug("Socket should be restarted")
+						log.Debug("Received done, restarting socket...")
 						socket = control.NewSocket(userFlag)
 						go socket.RecvData()
 					case w := <-keyTracker.TypedWord:
