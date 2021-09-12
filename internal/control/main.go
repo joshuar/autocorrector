@@ -108,6 +108,7 @@ func ConnectSocket() *Socket {
 		s = &Socket{
 			Conn: conn,
 			Data: make(chan interface{}),
+			Done: make(chan bool),
 		}
 		log.Debug("Socket connected.")
 		s.performHandshake()
@@ -128,6 +129,7 @@ func (s *Socket) RecvData() {
 		if err := gobDec.Decode(&packet); err != nil {
 			log.Errorf("Read error: %s", err)
 			if err == io.EOF {
+				log.Debug("Sending done channel to indicate restart needed")
 				s.Done <- true
 				break
 			}

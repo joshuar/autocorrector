@@ -88,7 +88,6 @@ func init() {
 }
 
 func onReady() {
-
 	socket := control.ConnectSocket()
 	go socket.RecvData()
 
@@ -102,83 +101,6 @@ func onReady() {
 	log.Debug("Client has started, asking server to resume tracking keys")
 	socket.SendState(control.Resume)
 
-	go func() {
-		systray.SetIcon(icon.Data)
-		systray.SetTooltip("Autocorrector corrects your typos")
-		mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
-		mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable autocorrector", true)
-		mStats := systray.AddMenuItem("Stats", "Show current stats")
-		mEdit := systray.AddMenuItem("Edit", "Edit the list of corrections")
-		mQuit := systray.AddMenuItem("Quit", "Quit autocorrector")
-
-		for {
-			select {
-			case <-mEnabled.ClickedCh:
-				if mEnabled.Checked() {
-					mEnabled.Uncheck()
-					socket.SendState(control.Pause)
-					notify.show("Autocorrector disabled", "Temporarily disabling autocorrector")
-				} else {
-					mEnabled.Check()
-					socket.SendState(control.Resume)
-					notify.show("Autocorrector enabled", "Re-enabling autocorrector")
-
-				}
-			case <-mCorrections.ClickedCh:
-				if mCorrections.Checked() {
-					mCorrections.Uncheck()
-					notify.showCorrections = false
-					notify.show("Hiding Corrections", "Hiding notifications for corrections")
-				} else {
-					mCorrections.Check()
-					notify.showCorrections = true
-					notify.show("Showing Corrections", "Notifications for corrections will be shown as they are made")
-
-				}
-			case <-mQuit.ClickedCh:
-				log.Info("Requesting quit")
-				socket.SendState(control.Pause)
-				systray.Quit()
-			case <-mStats.ClickedCh:
-				notify.show("Current Stats", stats.GetStats())
-			case <-mEdit.ClickedCh:
-				cmd := exec.Command("xdg-open", viper.ConfigFileUsed())
-				if err := cmd.Run(); err != nil {
-					log.Error(err)
-				}
-			}
-		}
-	}()
-
-	for msg := range socket.Data {
-		switch t := msg.(type) {
-		case *control.StateMsg:
-			switch t.State {
-			case control.Start:
-				log.Debug("Server has started, asking it to resume tracking keys")
-				socket.SendState(control.Resume)
-			case control.Stop:
-				log.Debug("Server has stopped")
-			default:
-				log.Debugf("Unhandled state: %v", msg)
-			}
-		case *control.WordMsg:
-			stats.AddChecked(t.Word)
-			t.Correction = corrections.findCorrection(t.Word)
-			if t.Correction != "" {
-				socket.SendWord(t.Word, t.Correction, t.Punct)
-				stats.AddCorrected(t.Word, t.Correction)
-				if notify.showCorrections {
-					notify.show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
-				}
-			}
-		default:
-			log.Debugf("Unhandled message recieved: %v", msg)
-		}
-	}
-}
-
-func handleTrayIcon(s *control.Socket, n *notificationsHandler, st *wordstats.WordStats) {
 	systray.SetIcon(icon.Data)
 	systray.SetTooltip("Autocorrector corrects your typos")
 	mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
@@ -189,39 +111,71 @@ func handleTrayIcon(s *control.Socket, n *notificationsHandler, st *wordstats.Wo
 
 	for {
 		select {
+		// case: recieved data on the socket
+		case msg := <-socket.Data:
+			switch t := msg.(type) {
+			case *control.StateMsg:
+				switch t.State {
+				case control.Start:
+					log.Debug("Server has started, asking it to resume tracking keys")
+					socket.SendState(control.Resume)
+				case control.Stop:
+					log.Debug("Server has stopped")
+				default:
+					log.Debugf("Unhandled state: %v", msg)
+				}
+			case *control.WordMsg:
+				stats.AddChecked(t.Word)
+				t.Correction = corrections.findCorrection(t.Word)
+				if t.Correction != "" {
+					socket.SendWord(t.Word, t.Correction, t.Punct)
+					stats.AddCorrected(t.Word, t.Correction)
+					if notify.showCorrections {
+						notify.show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
+					}
+				}
+			default:
+				log.Debugf("Unhandled message recieved: %v", msg)
+			}
+		// cases: user interacted with the tray icon
 		case <-mEnabled.ClickedCh:
 			if mEnabled.Checked() {
 				mEnabled.Uncheck()
-				s.SendState(control.Pause)
-				n.show("Autocorrector disabled", "Temporarily disabling autocorrector")
+				socket.SendState(control.Pause)
+				notify.show("Autocorrector disabled", "Temporarily disabling autocorrector")
 			} else {
 				mEnabled.Check()
-				s.SendState(control.Resume)
-				n.show("Autocorrector enabled", "Re-enabling autocorrector")
+				socket.SendState(control.Resume)
+				notify.show("Autocorrector enabled", "Re-enabling autocorrector")
 
 			}
 		case <-mCorrections.ClickedCh:
 			if mCorrections.Checked() {
 				mCorrections.Uncheck()
-				n.showCorrections = false
-				n.show("Hiding Corrections", "Hiding notifications for corrections")
+				notify.showCorrections = false
+				notify.show("Hiding Corrections", "Hiding notifications for corrections")
 			} else {
 				mCorrections.Check()
-				n.showCorrections = true
-				n.show("Showing Corrections", "Notifications for corrections will be shown as they are made")
+				notify.showCorrections = true
+				notify.show("Showing Corrections", "Notifications for corrections will be shown as they are made")
 
 			}
 		case <-mQuit.ClickedCh:
 			log.Info("Requesting quit")
-			s.SendState(control.Pause)
+			socket.SendState(control.Pause)
 			systray.Quit()
 		case <-mStats.ClickedCh:
-			n.show("Current Stats", st.GetStats())
+			notify.show("Current Stats", stats.GetStats())
 		case <-mEdit.ClickedCh:
 			cmd := exec.Command("xdg-open", viper.ConfigFileUsed())
 			if err := cmd.Run(); err != nil {
 				log.Error(err)
 			}
+		case <-socket.Done:
+			log.Debug("Received done, restarting socket...")
+			socket = control.ConnectSocket()
+			go socket.RecvData()
+			socket.SendState(control.Resume)
 		}
 	}
 }
