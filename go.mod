@@ -8,7 +8,7 @@ require (
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
 	github.com/getlantern/systray v1.1.0
-	github.com/joshuar/go-linuxkeyboard v0.0.0-20210605050610-7fdc9911013f
+	github.com/joshuar/go-linuxkeyboard v0.0.0-20210913124316-1575a669e5f0
 	github.com/magefile/mage v1.11.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.2.1
