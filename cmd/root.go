@@ -47,13 +47,14 @@ var (
 			keyboards := make(map[string]*keytracker.KeyTracker, len(kdbDevices))
 
 			for _, k := range kdbDevices {
+				log.Debugf("Tracking keys on device %s", k)
 				keyboards[k] = keytracker.NewKeyTracker(k)
 				keyboards[k].StartEvents()
-				go func() {
-					for w := range keyboards[k].TypedWord {
+				go func(kbd string) {
+					for w := range keyboards[kbd].TypedWord {
 						socket.SendWord(w.Word, "", w.Punct)
 					}
-				}()
+				}(k)
 			}
 
 			for {
@@ -89,7 +90,7 @@ var (
 							w := keytracker.NewWord(t.Word, t.Correction, t.Punct)
 							for _, kbd := range keyboards {
 								kbd.WordCorrection <- *w
-								return
+								break
 							}
 						default:
 							log.Debugf("Unhandled message recieved: %v", msg)
