@@ -120,9 +120,9 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker() *KeyTracker {
+func NewKeyTracker(kbdDevice string) *KeyTracker {
 	return &KeyTracker{
-		kbd:            LinuxKeyboard.NewLinuxKeyboard(LinuxKeyboard.FindKeyboardDevice()),
+		kbd:            LinuxKeyboard.NewLinuxKeyboard(kbdDevice),
 		kbdEvents:      make(chan LinuxKeyboard.KeyboardEvent),
 		WordCorrection: make(chan wordDetails),
 		TypedWord:      make(chan wordDetails),
