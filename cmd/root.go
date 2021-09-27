@@ -9,6 +9,7 @@ import (
 
 	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/keytracker"
+	"github.com/joshuar/go-linuxkeyboard/pkg/LinuxKeyboard"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -41,13 +42,26 @@ var (
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			var socket *control.Socket
+			kdbDevices := LinuxKeyboard.FindKeyboardDevice()
+
+			keyboards := make(map[string]*keytracker.KeyTracker, len(kdbDevices))
+
+			for _, k := range kdbDevices {
+				keyboards[k] = keytracker.NewKeyTracker(k)
+				keyboards[k].StartEvents()
+				go func() {
+					for w := range keyboards[k].TypedWord {
+						socket.SendWord(w.Word, "", w.Punct)
+					}
+				}()
+			}
 
 			for {
 				socket = control.NewSocket(userFlag)
 				go socket.RecvData()
 
-				keyTracker := keytracker.NewKeyTracker()
-				keyTracker.StartEvents()
+				// keyTracker := keytracker.NewKeyTracker()
+				// keyTracker.StartEvents()
 
 				// socket.SendState(control.Start)
 				for {
@@ -57,17 +71,26 @@ var (
 						case *control.StateMsg:
 							switch t.State {
 							case control.Start:
-								keyTracker.Start()
+								for _, kbd := range keyboards {
+									kbd.Start()
+								}
 							case control.Pause:
-								keyTracker.Pause()
+								for _, kbd := range keyboards {
+									kbd.Pause()
+								}
 							case control.Resume:
-								keyTracker.Resume()
+								for _, kbd := range keyboards {
+									kbd.Resume()
+								}
 							default:
 								log.Debugf("Unhandled state: %v", msg)
 							}
 						case *control.WordMsg:
 							w := keytracker.NewWord(t.Word, t.Correction, t.Punct)
-							keyTracker.WordCorrection <- *w
+							for _, kbd := range keyboards {
+								kbd.WordCorrection <- *w
+								return
+							}
 						default:
 							log.Debugf("Unhandled message recieved: %v", msg)
 						}
@@ -75,8 +98,8 @@ var (
 						log.Debug("Received done, restarting socket...")
 						socket = control.NewSocket(userFlag)
 						go socket.RecvData()
-					case w := <-keyTracker.TypedWord:
-						socket.SendWord(w.Word, "", w.Punct)
+						// case w := <-keyTracker.TypedWord:
+						// 	socket.SendWord(w.Word, "", w.Punct)
 					}
 				}
 			}
