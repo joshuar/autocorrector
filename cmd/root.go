@@ -9,7 +9,6 @@ import (
 
 	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/keytracker"
-	"github.com/joshuar/go-linuxkeyboard/pkg/LinuxKeyboard"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -42,29 +41,16 @@ var (
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			var socket *control.Socket
-			kdbDevices := LinuxKeyboard.FindKeyboardDevice()
 
-			keyboards := make(map[string]*keytracker.KeyTracker, len(kdbDevices))
+			kbdTracker := keytracker.NewKeyTracker()
+			defer kbdTracker.CloseKeyTracker()
 
-			for _, k := range kdbDevices {
-				log.Debugf("Tracking keys on device %s", k)
-				keyboards[k] = keytracker.NewKeyTracker(k)
-				keyboards[k].StartEvents()
-				go func(kbd string) {
-					for w := range keyboards[kbd].TypedWord {
-						socket.SendWord(w.Word, "", w.Punct)
-					}
-				}(k)
-			}
+			kbdTracker.StartEvents()
 
 			for {
 				socket = control.NewSocket(userFlag)
 				go socket.RecvData()
 
-				// keyTracker := keytracker.NewKeyTracker()
-				// keyTracker.StartEvents()
-
-				// socket.SendState(control.Start)
 				for {
 					select {
 					case msg := <-socket.Data:
@@ -72,26 +58,17 @@ var (
 						case *control.StateMsg:
 							switch t.State {
 							case control.Start:
-								for _, kbd := range keyboards {
-									kbd.Start()
-								}
+								kbdTracker.Start()
 							case control.Pause:
-								for _, kbd := range keyboards {
-									kbd.Pause()
-								}
+								kbdTracker.Pause()
 							case control.Resume:
-								for _, kbd := range keyboards {
-									kbd.Resume()
-								}
+								kbdTracker.Resume()
 							default:
 								log.Debugf("Unhandled state: %v", msg)
 							}
 						case *control.WordMsg:
 							w := keytracker.NewWord(t.Word, t.Correction, t.Punct)
-							for _, kbd := range keyboards {
-								kbd.WordCorrection <- *w
-								break
-							}
+							kbdTracker.WordCorrection <- *w
 						default:
 							log.Debugf("Unhandled message recieved: %v", msg)
 						}
@@ -99,8 +76,8 @@ var (
 						log.Debug("Received done, restarting socket...")
 						socket = control.NewSocket(userFlag)
 						go socket.RecvData()
-						// case w := <-keyTracker.TypedWord:
-						// 	socket.SendWord(w.Word, "", w.Punct)
+					case w := <-kbdTracker.TypedWord:
+						socket.SendWord(w.Word, "", w.Punct)
 					}
 				}
 			}

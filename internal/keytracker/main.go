@@ -2,7 +2,6 @@ package keytracker
 
 import (
 	"bytes"
-	"time"
 	"unicode"
 
 	"github.com/joshuar/go-linuxkeyboard/pkg/LinuxKeyboard"
@@ -23,7 +22,6 @@ type KeyTracker struct {
 // StartEvents opens the stats database, starts a goroutine to "slurp" words,
 // starts a goroutine to check for corrections
 func (kt *KeyTracker) StartEvents() {
-	go kt.kbd.Snoop(kt.kbdEvents)
 	go kt.slurpWords()
 	go kt.correctWords()
 }
@@ -101,7 +99,7 @@ func (kt *KeyTracker) correctWords() {
 		kt.Pause()
 		// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
 		// TODO: use an accurate number for the latency
-		time.Sleep(60 * time.Millisecond)
+		// time.Sleep(60 * time.Millisecond)
 		// Erase the existing word.
 		// Effectively, hit backspace key for the length of the word plus the punctuation mark.
 		log.Debugf("Making correction %s to %s", w.Word, w.Correction)
@@ -117,17 +115,21 @@ func (kt *KeyTracker) correctWords() {
 
 // CloseKeyTracker shuts down the channels used for key tracking
 func (kt *KeyTracker) CloseKeyTracker() {
+	kt.kbd.Close()
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(kbdDevice string) *KeyTracker {
-	return &KeyTracker{
-		kbd:            LinuxKeyboard.NewLinuxKeyboard(kbdDevice),
+func NewKeyTracker() *KeyTracker {
+	kbdDevices := LinuxKeyboard.FindKeyboardDevice()
+	kt := &KeyTracker{
+		kbd:            LinuxKeyboard.OpenLinuxKeyboard(kbdDevices[0]),
 		kbdEvents:      make(chan LinuxKeyboard.KeyboardEvent),
 		WordCorrection: make(chan wordDetails),
 		TypedWord:      make(chan wordDetails),
 		paused:         true,
 	}
+	LinuxKeyboard.SnoopAll(kt.kbdEvents)
+	return kt
 }
 
 type wordDetails struct {
