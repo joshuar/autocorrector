@@ -1,3 +1,11 @@
 {
-    "gitdoc.enabled": false
+    "gitdoc.enabled": false,
+    "spellright.language": [
+        "en_AU"
+    ],
+    "spellright.documentTypes": [
+        "markdown",
+        "latex",
+        "plaintext"
+    ]
 }

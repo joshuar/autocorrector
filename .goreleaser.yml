@@ -25,6 +25,7 @@ nfpms:
       - rpm
     dependencies:
       - libappindicator-gtk3
+      - libevdev
     contents:
       - src: init/autocorrector@.service
         dst: /usr/lib/systemd/system/autocorrector@.service
