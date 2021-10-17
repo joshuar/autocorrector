@@ -50,13 +50,14 @@ func (kt *KeyTracker) Resume() error {
 func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
 	for k := range kt.kbdEvents {
-		if k.Value == 1 && k.TypeName == "EV_KEY" {
+		if k.IsKeyPress() {
 			log.Debugf("Key pressed: %s %s %d %c\n", k.TypeName, k.EventName, k.Value, k.AsRune)
 		}
-		if k.Value == 0 && k.TypeName == "EV_KEY" {
+		if k.IsKeyRelease() {
 			log.Debugf("Key released: %s %s %d\n", k.TypeName, k.EventName, k.Value)
 			switch {
-			case k.AsRune == rune('\b'):
+			// case k.AsRune == rune('\b'):
+			case k.IsBackspace():
 				// backspace key
 				if charBuf.Len() > 0 {
 					charBuf.Truncate(charBuf.Len() - 1)
@@ -71,8 +72,7 @@ func (kt *KeyTracker) slurpWords() {
 					charBuf.Reset()
 					kt.TypedWord <- *w
 				}
-			case k.EventName == "KEY_LEFTCTRL" || k.EventName == "KEY_RIGHTCTRL" || k.EventName == "KEY_LEFTALT" || k.EventName == "KEY_RIGHTALT" || k.EventName == "KEY_LEFTMETA" || k.EventName == "KEY_RIGHTMETA":
-			case k.EventName == "KEY_LEFTSHIFT" || k.EventName == "KEY_RIGHTSHIFT":
+			// case k.IsModifier():
 			default:
 				// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
 				charBuf.Reset()
@@ -82,54 +82,11 @@ func (kt *KeyTracker) slurpWords() {
 			log.Debugf("Key held: %s %s %d %c\n", k.TypeName, k.EventName, k.Value, k.AsRune)
 		}
 	}
-
-	// for {
-	// 	e, ok := <-kt.kbdEvents
-	// 	if !ok {
-	// 		charBuf.Reset()
-	// 		return
-	// 	}
-	// 	switch {
-	// 	case kt.paused:
-	// 		// don't do anything when we aren't tracking keys, just reset the buffer
-	// 		charBuf.Reset()
-	// 	case e.Key.IsKeyPress():
-	// 		// don't act on key presses, just key releases
-	// 		log.Debugf("Pressed key -- value: %d code: %d type: %d string: %s rune: %d (%c)", e.Key.Value, e.Key.Code, e.Key.Type, e.AsString, e.AsRune, e.AsRune)
-	// 	case e.Key.IsKeyRelease():
-	// 		log.Debugf("Released key -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
-	// 		switch {
-	// 		case e.AsRune == rune('\b'):
-	// 			// backspace key
-	// 			if charBuf.Len() > 0 {
-	// 				charBuf.Truncate(charBuf.Len() - 1)
-	// 			}
-	// 		case unicode.IsDigit(e.AsRune) || unicode.IsLetter(e.AsRune):
-	// 			// a letter or number
-	// 			charBuf.WriteRune(e.AsRune)
-	// 		case unicode.IsPunct(e.AsRune) || unicode.IsSymbol(e.AsRune) || unicode.IsSpace(e.AsRune):
-	// 			// a punctuation mark, which would indicate a word has been typed, so handle that
-	// 			if charBuf.Len() > 0 {
-	// 				w := NewWord(charBuf.String(), "", e.AsRune)
-	// 				charBuf.Reset()
-	// 				kt.TypedWord <- *w
-	// 			}
-	// 		case e.AsString == "L_CTRL" || e.AsString == "R_CTRL" || e.AsString == "L_ALT" || e.AsString == "R_ALT" || e.AsString == "L_META" || e.AsString == "R_META":
-	// 		case e.AsString == "L_SHIFT" || e.AsString == "R_SHIFT":
-	// 		default:
-	// 			// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
-	// 			charBuf.Reset()
-	// 		}
-	// 	default:
-	// 		log.Debugf("Other event -- value: %d code: %d type: %d", e.Key.Value, e.Key.Code, e.Key.Type)
-	// 	}
-
-	// }
 }
 
 func (kt *KeyTracker) correctWords() {
 	for w := range kt.WordCorrection {
-		kt.Pause()
+		// kt.Pause()
 		// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
 		// TODO: use an accurate number for the latency
 		// time.Sleep(60 * time.Millisecond)
@@ -142,7 +99,7 @@ func (kt *KeyTracker) correctWords() {
 		// Insert the replacement.
 		// Type out the replacement and whatever punctuation/delimiter was after it.
 		kt.kbd.TypeString(w.Correction + string(w.Punct))
-		kt.Resume()
+		// kt.Resume()
 	}
 }
 
@@ -154,7 +111,7 @@ func (kt *KeyTracker) CloseKeyTracker() {
 // NewKeyTracker creates a new keyTracker struct
 func NewKeyTracker() *KeyTracker {
 	kt := &KeyTracker{
-		kbd:            kbd.NewVirtualKeyboard(),
+		kbd:            kbd.NewVirtualKeyboard("autocorrector"),
 		kbdEvents:      make(chan kbd.KeyEvent),
 		WordCorrection: make(chan wordDetails),
 		TypedWord:      make(chan wordDetails),
