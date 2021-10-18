@@ -19,10 +19,8 @@ import (
 
 const (
 	SocketPath       = "/tmp/autocorrector.sock"
-	Start      State = 0x01
-	Resume     State = 0x02
-	Pause      State = 0x03
-	Stop       State = 0x04
+	Resume     State = 0x01
+	Pause      State = 0x02
 )
 
 type State int8
@@ -57,6 +55,11 @@ type Socket struct {
 
 // NewSocket is used by the server command to create a new socket for communication between server and client
 func NewSocket(username string) *Socket {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Fatalf("Error in NewSocket: %v", r)
+		}
+	}()
 	if err := os.Remove(SocketPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Warnf("Could not remove existing socket path: %s (%v)", SocketPath, err)
 	}
@@ -79,6 +82,11 @@ func NewSocket(username string) *Socket {
 }
 
 func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Fatalf("Error in listenOnSocket: %v", r)
+		}
+	}()
 	listener, err := net.ListenUnix("unixpacket", addr)
 	checkFatal(err)
 	u, err := user.Lookup(username)
@@ -92,6 +100,11 @@ func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
 }
 
 func AcceptOnSocket(listener *net.UnixListener) net.Conn {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Fatalf("Error in AcceptOnSocket: %v", r)
+		}
+	}()
 	conn, err := listener.Accept()
 	checkFatal(err)
 	return conn
@@ -218,6 +231,12 @@ func (s *Socket) SendWord(w string, c string, p rune) {
 }
 
 func (s *Socket) performHandshake() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Fatalf("Error in performHandShake: %v", r)
+		}
+	}()
+
 	log.Debug("Performing handshake...")
 
 	var peerKey [32]byte
@@ -239,6 +258,6 @@ func (s *Socket) performHandshake() {
 
 func checkFatal(err error) {
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }

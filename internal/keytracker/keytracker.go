@@ -56,7 +56,6 @@ func (kt *KeyTracker) slurpWords() {
 		if k.IsKeyRelease() {
 			log.Debugf("Key released: %s %s %d\n", k.TypeName, k.EventName, k.Value)
 			switch {
-			// case k.AsRune == rune('\b'):
 			case k.IsBackspace():
 				// backspace key
 				if charBuf.Len() > 0 {
@@ -72,7 +71,6 @@ func (kt *KeyTracker) slurpWords() {
 					charBuf.Reset()
 					kt.TypedWord <- *w
 				}
-			// case k.IsModifier():
 			default:
 				// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
 				charBuf.Reset()

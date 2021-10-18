@@ -34,21 +34,19 @@ var (
 			}
 			if profileFlag {
 				go func() {
-					log.Debug(http.ListenAndServe("localhost:6060", nil))
+					log.Info(http.ListenAndServe("localhost:6060", nil))
 				}()
-				log.Debug("Profiling is enabled and available at localhost:6060")
+				log.Info("Profiling is enabled and available at localhost:6060")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			var socket *control.Socket
-
 			kbdTracker := keytracker.NewKeyTracker()
 			defer kbdTracker.CloseKeyTracker()
 
 			kbdTracker.StartEvents()
 
 			for {
-				socket = control.NewSocket(userFlag)
+				socket := control.NewSocket(userFlag)
 				go socket.RecvData()
 
 				for {
@@ -57,20 +55,18 @@ var (
 						switch t := msg.(type) {
 						case *control.StateMsg:
 							switch t.State {
-							case control.Start:
-								kbdTracker.Start()
 							case control.Pause:
 								kbdTracker.Pause()
 							case control.Resume:
 								kbdTracker.Resume()
 							default:
-								log.Debugf("Unhandled state: %v", msg)
+								log.Debugf("Unknown state: %v", msg)
 							}
 						case *control.WordMsg:
 							w := keytracker.NewWord(t.Word, t.Correction, t.Punct)
 							kbdTracker.WordCorrection <- *w
 						default:
-							log.Debugf("Unhandled message recieved: %v", msg)
+							log.Debugf("Unknown message received: %v", msg)
 						}
 					case <-socket.Done:
 						log.Debug("Received done, restarting socket...")
