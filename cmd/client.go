@@ -154,7 +154,9 @@ func onReady() {
 			socket.SendState(control.Pause)
 			systray.Quit()
 		case <-mStats.ClickedCh:
+			notify.ShowCorrections = true
 			notify.Show("Current statistics", stats.GetStats())
+			notify.ShowCorrections = false
 		case <-mEdit.ClickedCh:
 			cmd := exec.Command("xdg-open", viper.ConfigFileUsed())
 			if err := cmd.Run(); err != nil {
