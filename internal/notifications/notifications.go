@@ -1,6 +1,9 @@
 package notifications
 
-import "github.com/gen2brain/beeep"
+import (
+	"github.com/gen2brain/beeep"
+	log "github.com/sirupsen/logrus"
+)
 
 type notificationMsg struct {
 	title, message string
@@ -10,7 +13,7 @@ type notificationsHandler struct {
 	notification    chan *notificationMsg
 }
 
-// Show will generate an appropriately formatted notification and send it through the notification channel
+// Show will generate an appropriately formatted notification and send it through the notification channel if notifications are enabled
 func (nh *notificationsHandler) Show(t string, m string) {
 	n := &notificationMsg{
 		title:   t,
@@ -27,6 +30,7 @@ func NewNotificationsHandler() *notificationsHandler {
 	}
 	go func() {
 		for n := range nh.notification {
+			log.Debugf("Recieved notification %s: %s", n.title, n.message)
 			if nh.ShowCorrections {
 				beeep.Notify(n.title, n.message, "")
 			}
