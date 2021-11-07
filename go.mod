@@ -3,7 +3,7 @@ module github.com/joshuar/autocorrector
 go 1.15
 
 require (
-	github.com/adrg/xdg v0.3.4
+	github.com/adrg/xdg v0.4.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
@@ -15,5 +15,4 @@ require (
 	github.com/spf13/viper v1.9.0
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
-	golang.org/x/sys v0.0.0-20211015200801-69063c4bb744 // indirect
 )
