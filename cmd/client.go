@@ -113,7 +113,9 @@ func onReady() {
 				if t.Correction = corrections.findCorrection(t.Word); t.Correction != "" {
 					socket.SendWord(t.Word, t.Correction, t.Punct)
 					stats.AddCorrected(t.Word, t.Correction)
-					notify.Show("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
+					if notify.ShowNotifications {
+						notify.Send("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
+					}
 				}
 			default:
 				log.Debugf("Unknown message received: %v", msg)
@@ -149,11 +151,11 @@ func onReady() {
 				if mCorrections.Checked() {
 					mCorrections.Uncheck()
 					systray.SetIcon(icon.Default)
-					notify.ShowCorrections = false
+					notify.ShowNotifications = false
 				} else {
 					mCorrections.Check()
-					notify.ShowCorrections = true
-					notify.Show("Showing Corrections", "Notifications for corrections will be shown as they are made")
+					notify.ShowNotifications = true
+					notify.Send("Showing Corrections", "Notifications for corrections will be shown as they are made")
 					systray.SetIcon(icon.Notifying)
 				}
 			case <-mQuit.ClickedCh:

@@ -50,10 +50,8 @@ func (kt *KeyTracker) Resume() error {
 func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
 	for k := range kt.kbdEvents {
-		if k.IsKeyPress() {
-			log.Debugf("Key pressed: %s %s %d %c\n", k.TypeName, k.EventName, k.Value, k.AsRune)
-		}
-		if k.IsKeyRelease() {
+		switch {
+		case k.IsKeyRelease():
 			log.Debugf("Key released: %s %s %d\n", k.TypeName, k.EventName, k.Value)
 			switch {
 			case k.IsBackspace():
@@ -61,10 +59,10 @@ func (kt *KeyTracker) slurpWords() {
 				if charBuf.Len() > 0 {
 					charBuf.Truncate(charBuf.Len() - 1)
 				}
-			case unicode.IsDigit(k.AsRune) || unicode.IsLetter(k.AsRune):
+			case unicode.IsDigit(k.AsRune), unicode.IsLetter(k.AsRune):
 				// a letter or number
 				charBuf.WriteRune(k.AsRune)
-			case unicode.IsPunct(k.AsRune) || unicode.IsSymbol(k.AsRune) || unicode.IsSpace(k.AsRune):
+			case unicode.IsPunct(k.AsRune), unicode.IsSymbol(k.AsRune), unicode.IsSpace(k.AsRune):
 				// a punctuation mark, which would indicate a word has been typed, so handle that
 				if charBuf.Len() > 0 {
 					w := NewWord(charBuf.String(), "", k.AsRune)
@@ -75,8 +73,9 @@ func (kt *KeyTracker) slurpWords() {
 				// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
 				charBuf.Reset()
 			}
-		}
-		if k.Value == 2 && k.TypeName == "EV_KEY" {
+		case k.IsKeyPress():
+			log.Debugf("Key pressed: %s %s %d %c\n", k.TypeName, k.EventName, k.Value, k.AsRune)
+		case k.Value == 2 && k.TypeName == "EV_KEY":
 			log.Debugf("Key held: %s %s %d %c\n", k.TypeName, k.EventName, k.Value, k.AsRune)
 		}
 	}
