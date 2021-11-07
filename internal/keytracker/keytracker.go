@@ -25,15 +25,14 @@ func (kt *KeyTracker) StartEvents() {
 	go kt.correctWords()
 }
 
+// Start will start corrections
 func (kt *KeyTracker) Start() error {
 	log.Debug("Starting keytracker...")
 	kt.paused = false
-	// kt.kbdEvents = make(chan LinuxKeyboard.KeyboardEvent)
-	// go kt.slurpWords()
-	// go kt.kbd.Snoop(kt.kbdEvents)
 	return nil
 }
 
+// Pause will stop corrections
 func (kt *KeyTracker) Pause() error {
 	log.Debug("Pausing keytracker...")
 	kt.paused = true
@@ -41,6 +40,7 @@ func (kt *KeyTracker) Pause() error {
 	return nil
 }
 
+// Resume will resume corrections
 func (kt *KeyTracker) Resume() error {
 	log.Debug("Resuming keytracker...")
 	kt.paused = false
@@ -83,20 +83,20 @@ func (kt *KeyTracker) slurpWords() {
 
 func (kt *KeyTracker) correctWords() {
 	for w := range kt.WordCorrection {
-		// kt.Pause()
 		// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
 		// TODO: use an accurate number for the latency
 		// time.Sleep(60 * time.Millisecond)
-		// Erase the existing word.
-		// Effectively, hit backspace key for the length of the word plus the punctuation mark.
-		log.Debugf("Making correction %s to %s", w.Word, w.Correction)
-		for i := 0; i <= len(w.Word); i++ {
-			kt.kbd.TypeBackspace()
+		if !kt.paused {
+			log.Debugf("Making correction %s to %s", w.Word, w.Correction)
+			// Erase the existing word.
+			// Effectively, hit backspace key for the length of the word plus the punctuation mark.
+			for i := 0; i <= len(w.Word); i++ {
+				kt.kbd.TypeBackspace()
+			}
+			// Insert the replacement.
+			// Type out the replacement and whatever punctuation/delimiter was after it.
+			kt.kbd.TypeString(w.Correction + string(w.Punct))
 		}
-		// Insert the replacement.
-		// Type out the replacement and whatever punctuation/delimiter was after it.
-		kt.kbd.TypeString(w.Correction + string(w.Punct))
-		// kt.Resume()
 	}
 }
 
@@ -126,6 +126,8 @@ type wordDetails struct {
 	Punct            rune
 }
 
+// NewWord creates a struct to hold a word, its correction and the
+// punctuation mark that follows it
 func NewWord(w string, c string, p rune) *wordDetails {
 	return &wordDetails{
 		Word:       w,

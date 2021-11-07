@@ -9,10 +9,10 @@ import (
 	"syscall"
 
 	"github.com/adrg/xdg"
-	"github.com/fsnotify/fsnotify"
 	"github.com/getlantern/systray"
 	"github.com/joshuar/autocorrector/assets/icon"
 	"github.com/joshuar/autocorrector/internal/control"
+	"github.com/joshuar/autocorrector/internal/corrections"
 	"github.com/joshuar/autocorrector/internal/notifications"
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	log "github.com/sirupsen/logrus"
@@ -94,7 +94,7 @@ func onReady() {
 	notify := notifications.NewNotificationsHandler()
 
 	stats := wordstats.OpenWordStats()
-	corrections := newCorrections()
+	corrections := corrections.NewCorrections()
 
 	log.Debug("Client has started, asking server to resume tracking keys")
 	socket.SendState(control.Resume)
@@ -110,12 +110,10 @@ func onReady() {
 				}
 			case *control.WordMsg:
 				stats.AddChecked(t.Word)
-				if t.Correction = corrections.findCorrection(t.Word); t.Correction != "" {
+				if t.Correction = corrections.FindCorrection(t.Word); t.Correction != "" {
 					socket.SendWord(t.Word, t.Correction, t.Punct)
 					stats.AddCorrected(t.Word, t.Correction)
-					if notify.ShowNotifications {
-						notify.Send("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
-					}
+					notify.Send("Correction!", fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction))
 				}
 			default:
 				log.Debugf("Unknown message received: %v", msg)
@@ -136,7 +134,6 @@ func onReady() {
 
 		for {
 			select {
-			// cases: user interacted with the tray icon
 			case <-mEnabled.ClickedCh:
 				if mEnabled.Checked() {
 					mEnabled.Uncheck()
@@ -180,58 +177,4 @@ func onReady() {
 }
 
 func onExit() {
-}
-
-type corrections struct {
-	correctionList    map[string]string
-	updateCorrections chan bool
-}
-
-func (c *corrections) findCorrection(misspelling string) string {
-	return c.correctionList[misspelling]
-}
-
-func (c *corrections) checkConfig() {
-	// check if any value is also a key
-	// in this case, we'd end up with replacing the typo then replacing the replacement
-	c.correctionList = make(map[string]string)
-	viper.Unmarshal(&c.correctionList)
-	for _, v := range c.correctionList {
-		found := viper.GetString(v)
-		if found != "" {
-			log.Warnf("A replacement (%s) in the config is also listed as a typo. Deleting it to avoid recursive error.", v)
-			delete(c.correctionList, found)
-		}
-	}
-	log.Debug("Config looks okay.")
-}
-
-func newCorrections() *corrections {
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
-		} else {
-			log.Fatal(fmt.Errorf("fatal error config file: %s", err))
-		}
-	}
-	log.Debugf("Using corrections config at %s", viper.ConfigFileUsed())
-	corrections := &corrections{
-		updateCorrections: make(chan bool),
-	}
-	corrections.checkConfig()
-	go func() {
-		for {
-			switch {
-			case <-corrections.updateCorrections:
-				corrections.checkConfig()
-			}
-		}
-
-	}()
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Debugf("Config file %s has changed, getting updates.", viper.ConfigFileUsed())
-		corrections.updateCorrections <- true
-	})
-	viper.WatchConfig()
-	return corrections
 }
