@@ -25,18 +25,10 @@ func (kt *KeyTracker) StartEvents() {
 	go kt.correctWords()
 }
 
-// Start will start corrections
-func (kt *KeyTracker) Start() error {
-	log.Debug("Starting keytracker...")
-	kt.paused = false
-	return nil
-}
-
 // Pause will stop corrections
 func (kt *KeyTracker) Pause() error {
 	log.Debug("Pausing keytracker...")
 	kt.paused = true
-	// close(kt.kbdEvents)
 	return nil
 }
 
@@ -50,9 +42,7 @@ func (kt *KeyTracker) Resume() error {
 func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
 	for k := range kt.kbdEvents {
-		switch {
-		case k.IsKeyRelease():
-			log.Debugf("Key released: %s %s %d\n", k.TypeName, k.EventName, k.Value)
+		if k.IsKeyRelease() {
 			switch {
 			case k.IsBackspace():
 				// backspace key
@@ -73,10 +63,6 @@ func (kt *KeyTracker) slurpWords() {
 				// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
 				charBuf.Reset()
 			}
-		case k.IsKeyPress():
-			log.Debugf("Key pressed: %s %s %d %c\n", k.TypeName, k.EventName, k.Value, k.AsRune)
-		case k.Value == 2 && k.TypeName == "EV_KEY":
-			log.Debugf("Key held: %s %s %d %c\n", k.TypeName, k.EventName, k.Value, k.AsRune)
 		}
 	}
 }
