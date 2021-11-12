@@ -20,10 +20,10 @@ import (
 const (
 	SocketPath       = "/tmp/autocorrector.sock"
 	Resume     State = 0x01
-	Pause      State = 0x02
+	Pause      State = 0x00
 )
 
-type State int8
+type State byte
 
 type StateMsg struct {
 	State
@@ -212,10 +212,20 @@ func (s *Socket) sendEncrypted(msgData interface{}) {
 	}
 }
 
-// SendState sends a message to the socket of type State
-func (s *Socket) SendState(state State) {
+// PauseServer sends a state message to indicate the server should pause
+// tracking key presses
+func (s *Socket) PauseServer() {
 	msg := &StateMsg{
-		State: state,
+		State: Pause,
+	}
+	s.sendEncrypted(msg)
+}
+
+// ResumeServer sends a state message to indicate the server should resume
+// tracking key presses
+func (s *Socket) ResumeServer() {
+	msg := &StateMsg{
+		State: Resume,
 	}
 	s.sendEncrypted(msg)
 }

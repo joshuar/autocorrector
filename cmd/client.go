@@ -97,17 +97,12 @@ func onReady() {
 	corrections := corrections.NewCorrections()
 
 	log.Debug("Client has started, asking server to resume tracking keys")
-	socket.SendState(control.Resume)
+	socket.ResumeServer()
 
 	go func() {
 		for msg := range socket.Data {
 			// case: recieved data on the socket
 			switch t := msg.(type) {
-			case *control.StateMsg:
-				switch t.State {
-				default:
-					log.Debugf("Unknown state: %v", msg)
-				}
 			case *control.WordMsg:
 				stats.AddChecked(t.Word)
 				if t.Correction = corrections.FindCorrection(t.Word); t.Correction != "" {
@@ -137,11 +132,11 @@ func onReady() {
 			case <-mEnabled.ClickedCh:
 				if mEnabled.Checked() {
 					mEnabled.Uncheck()
-					socket.SendState(control.Pause)
+					socket.PauseServer()
 					systray.SetIcon(icon.Disabled)
 				} else {
 					mEnabled.Check()
-					socket.SendState(control.Resume)
+					socket.ResumeServer()
 					systray.SetIcon(icon.Default)
 				}
 			case <-mCorrections.ClickedCh:
@@ -157,7 +152,7 @@ func onReady() {
 				}
 			case <-mQuit.ClickedCh:
 				log.Info("Requesting quit")
-				socket.SendState(control.Pause)
+				socket.PauseServer()
 				systray.Quit()
 			case <-mStats.ClickedCh:
 				mStatsDisplay.SetTitle(stats.GetStats())
@@ -170,7 +165,7 @@ func onReady() {
 				log.Debug("Received done, restarting socket...")
 				socket = control.ConnectSocket()
 				go socket.RecvData()
-				socket.SendState(control.Resume)
+				socket.ResumeServer()
 			}
 		}
 	}()
