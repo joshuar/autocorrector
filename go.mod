@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/adrg/xdg v0.4.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
 	github.com/getlantern/systray v1.1.0

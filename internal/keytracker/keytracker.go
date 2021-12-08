@@ -41,36 +41,29 @@ func (kt *KeyTracker) Resume() error {
 
 func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
-	var doubleSpace int
+	patternBuf := new(bytes.Buffer)
+	// var doubleSpace int
 	for k := range kt.kbdEvents {
 		if k.IsKeyRelease() {
+			patternBuf.WriteRune(k.AsRune)
+			if bytes.HasSuffix(patternBuf.Bytes(), []byte(".  ")) {
+				kt.kbd.TypeBackspace()
+				patternBuf.Reset()
+			}
+			if patternBuf.Len() == 3 {
+				log.Debug("Resetting pattern buffer...")
+				patternBuf.Reset()
+			}
 			switch {
 			case k.IsBackspace():
 				// backspace key
 				if charBuf.Len() > 0 {
 					charBuf.Truncate(charBuf.Len() - 1)
 				}
-				if doubleSpace > 0 {
-					doubleSpace = 0
-				}
 			case unicode.IsDigit(k.AsRune), unicode.IsLetter(k.AsRune):
 				// a letter or number
 				charBuf.WriteRune(k.AsRune)
-				if doubleSpace > 0 {
-					doubleSpace = 0
-				}
 			case unicode.IsPunct(k.AsRune), unicode.IsSymbol(k.AsRune), unicode.IsSpace(k.AsRune):
-				switch {
-				case k.AsRune == '.' && doubleSpace == 0:
-					doubleSpace++
-				case k.AsRune == ' ' && doubleSpace == 1:
-					doubleSpace++
-				case k.AsRune == ' ' && doubleSpace == 2:
-					kt.kbd.TypeBackspace()
-					doubleSpace = 0
-				default:
-					doubleSpace = 0
-				}
 				// a punctuation mark, which would indicate a word has been typed, so handle that
 				if charBuf.Len() > 0 {
 					w := NewWord(charBuf.String(), "", k.AsRune)
@@ -80,9 +73,6 @@ func (kt *KeyTracker) slurpWords() {
 			default:
 				// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
 				charBuf.Reset()
-				if doubleSpace > 0 {
-					doubleSpace = 0
-				}
 			}
 		}
 	}
