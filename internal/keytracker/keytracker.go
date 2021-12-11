@@ -13,7 +13,7 @@ import (
 // backspace is pressed
 type KeyTracker struct {
 	kbd                       *kbd.VirtualKeyboardDevice
-	kbdEvents                 chan kbd.KeyEvent
+	kbdEvents                 <-chan kbd.KeyEvent
 	TypedWord, WordCorrection chan wordDetails
 	paused                    bool
 }
@@ -51,7 +51,6 @@ func (kt *KeyTracker) slurpWords() {
 				patternBuf.Reset()
 			}
 			if patternBuf.Len() == 3 {
-				log.Debug("Resetting pattern buffer...")
 				patternBuf.Reset()
 			}
 			switch {
@@ -105,18 +104,13 @@ func (kt *KeyTracker) CloseKeyTracker() {
 
 // NewKeyTracker creates a new keyTracker struct
 func NewKeyTracker() *KeyTracker {
-	kt := &KeyTracker{
+	return &KeyTracker{
 		kbd:            kbd.NewVirtualKeyboard("autocorrector"),
-		kbdEvents:      make(chan kbd.KeyEvent),
+		kbdEvents:      kbd.SnoopAllKeyboards(kbd.OpenKeyboardDevices()),
 		WordCorrection: make(chan wordDetails),
 		TypedWord:      make(chan wordDetails),
 		paused:         true,
 	}
-	err := kbd.SnoopAllKeyboards(kt.kbdEvents)
-	if err != nil {
-		log.Fatalf("Error: %v", err)
-	}
-	return kt
 }
 
 type wordDetails struct {
