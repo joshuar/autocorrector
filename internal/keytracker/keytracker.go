@@ -41,16 +41,12 @@ func (kt *KeyTracker) Resume() error {
 
 func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
-	patternBuf := new(bytes.Buffer)
+	patternBuf := newPatternBuf(3)
 	for k := range kt.kbdEvents {
 		if k.IsKeyRelease() {
-			patternBuf.WriteRune(k.AsRune)
-			if bytes.HasSuffix(patternBuf.Bytes(), []byte(".  ")) {
+			patternBuf.write(k.AsRune)
+			if patternBuf.match(".  ") {
 				kt.kbd.TypeBackspace()
-				patternBuf.Reset()
-			}
-			if patternBuf.Len() == 3 {
-				patternBuf.Reset()
 			}
 			switch {
 			case k.IsBackspace():
@@ -125,4 +121,29 @@ func NewWord(w string, c string, p rune) *wordDetails {
 		Correction: c,
 		Punct:      p,
 	}
+}
+
+type patternBuf struct {
+	buf      *bytes.Buffer
+	len, idx int
+}
+
+func newPatternBuf(size int) *patternBuf {
+	return &patternBuf{
+		buf: new(bytes.Buffer),
+		len: size,
+		idx: 0,
+	}
+}
+
+func (pb *patternBuf) write(r rune) {
+	if pb.idx == 3 {
+		pb.buf.Reset()
+		pb.idx = 0
+	}
+	pb.buf.WriteRune(r)
+}
+
+func (pb *patternBuf) match(s string) bool {
+	return bytes.HasSuffix(pb.buf.Bytes(), []byte(s))
 }
