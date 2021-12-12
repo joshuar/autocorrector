@@ -14,6 +14,7 @@ require (
 	github.com/smallnest/ringbuffer v0.0.0-20210227121335-0a58434b36f2
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
+	github.com/xujiajun/nutsdb v0.6.0
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b
 )

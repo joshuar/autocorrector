@@ -10,92 +10,92 @@ import (
 	"github.com/adrg/xdg"
 	log "github.com/sirupsen/logrus"
 
-	bolt "go.etcd.io/bbolt"
+	"github.com/xujiajun/nutsdb"
 )
 
 const (
 	countersBucket    = "counters"
 	correctionsBucket = "correctionsLog"
+	dbFileSuffix      = "autocorrector/stats.nutsdb"
 )
 
 // WordStats stores counters for words checked and words corrected
 type WordStats struct {
-	db        *bolt.DB
+	db        *nutsdb.DB
 	Checked   chan string
 	Corrected chan [2]string
 }
 
-type wordAction struct {
-	Word       string
-	action     string
-	Correction string
-	Timestamp  string
+func (w *WordStats) get(key, bucket string) []byte {
+	var value []byte
+	if err := w.db.View(
+		func(tx *nutsdb.Tx) error {
+			if e, err := tx.Get(bucket, []byte(key)); err != nil {
+				return err
+			} else {
+				value = e.Value
+			}
+			return nil
+		}); err != nil {
+		log.Warnf("Couldn't get value for key %s from bucket %s: %v", key, bucket, err)
+	}
+	return value
+}
+
+func (w *WordStats) set(key, bucket string, i interface{}) {
+	var value []byte
+	switch v := i.(type) {
+	case uint64:
+		value = make([]byte, binary.MaxVarintLen64)
+		binary.PutUvarint(value, v)
+	case wordAction:
+		value = encode(&v)
+	}
+	if err := w.db.Update(
+		func(tx *nutsdb.Tx) error {
+			if err := tx.Put(bucket, []byte(key), value, 0); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+		log.Warnf("Couldn't set value for key %s from bucket %s: %v", key, bucket, err)
+	}
 }
 
 func (w *WordStats) addChecked() {
 	for range w.Checked {
-		checkedTotal := w.readAsInt("checkedTotal")
-		w.writeAsInt("checkedTotal", checkedTotal+1)
+		checkedTotal, _ := binary.Uvarint(w.get("checkedTotal", countersBucket))
+		w.set("checkedTotal", countersBucket, checkedTotal+1)
 	}
 }
 
 func (w *WordStats) addCorrected() {
 	for c := range w.Corrected {
-		correctedTotal := w.readAsInt("correctedTotal")
-		w.writeAsInt("correctedTotal", correctedTotal+1)
+		correctedTotal, _ := binary.Uvarint(w.get("correctedTotal", countersBucket))
+		w.set("correctedTotal", countersBucket, correctedTotal+1)
 		corrected := newWordAction(c[0], "corrected", c[1])
-		err := w.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(correctionsBucket))
-			err := b.Put([]byte(corrected.Timestamp), encode(corrected))
-			return err
-		})
-		if err != nil {
-			log.Error(err)
-		}
-	}
-}
-
-func (w *WordStats) readAsInt(key string) uint64 {
-	var valueAsBuf []byte
-	var valueAsInt uint64
-	w.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(countersBucket))
-		valueAsBuf = b.Get([]byte(key))
-		return nil
-	})
-	valueAsInt, _ = binary.Uvarint(valueAsBuf)
-	return valueAsInt
-}
-
-func (w *WordStats) writeAsInt(key string, value uint64) {
-	valueBuf := make([]byte, binary.MaxVarintLen64)
-	binary.PutUvarint(valueBuf, value)
-	err := w.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(countersBucket))
-		err := b.Put([]byte(key), valueBuf)
-		return err
-	})
-	if err != nil {
-		log.Error(err)
+		w.set(corrected.Timestamp, correctionsBucket, corrected)
 	}
 }
 
 // CalcAccuracy returns the "accuracy" for the current session
 // accuracy is measured as how close to not correcting any words
 func (w *WordStats) CalcAccuracy() float64 {
-	checkedTotal := w.readAsInt("checkedTotal")
-	correctedTotal := w.readAsInt("correctedTotal")
+	checkedTotal, _ := binary.Uvarint(w.get("checkedTotal", countersBucket))
+	correctedTotal, _ := binary.Uvarint(w.get("correctedTotal", countersBucket))
 	return (1 - float64(correctedTotal)/float64(checkedTotal)) * 100
 }
 
 // GetCheckedTotal fetches the total number of checked words from the database
 func (w *WordStats) GetCheckedTotal() uint64 {
-	return w.readAsInt("checkedTotal")
+	v, _ := binary.Uvarint(w.get("checkedTotal", countersBucket))
+	return v
 }
 
 // GetCorrectedTotal fetches the total number of corrected words from the database
 func (w *WordStats) GetCorrectedTotal() uint64 {
-	return w.readAsInt("correctedTotal")
+	v, _ := binary.Uvarint(w.get("correctedTotal", countersBucket))
+	return v
 }
 
 // CloseWordStats closes the stats database cleanly
@@ -123,19 +123,54 @@ func (w *WordStats) GetStats() string {
 
 // ShowLog prints out the full log of corrections history
 func (w *WordStats) ShowLog() {
-	var fullLog string
-	fullLog = "Correction Log:\n"
-	w.db.View(func(tx *bolt.Tx) error {
-		// Assume bucket exists and has keys
-		b := tx.Bucket([]byte(correctionsBucket))
-		b.ForEach(func(k, v []byte) error {
-			logEntry := decode(v)
-			fullLog += fmt.Sprintf("%s: replaced %s with %s\n", k, logEntry.Word, logEntry.Correction)
-			return nil
-		})
-		return nil
-	})
-	log.Info(fullLog)
+
+	// var fullLog string
+	// fullLog = "Correction Log:\n"
+	// w.db.View(func(tx *bolt.Tx) error {
+	// 	// Assume bucket exists and has keys
+	// 	b := tx.Bucket([]byte(correctionsBucket))
+	// 	b.ForEach(func(k, v []byte) error {
+	// 		logEntry := decode(v)
+	// 		fullLog += fmt.Sprintf("%s: replaced %s with %s\n", k, logEntry.Word, logEntry.Correction)
+	// 		return nil
+	// 	})
+	// 	return nil
+	// })
+	log.Info("not implemented yet")
+}
+
+// OpenWordStats creates a new wordStats struct
+func OpenWordStats() *WordStats {
+	// open the on-disk database
+	statsDbFile, err := xdg.DataFile(dbFileSuffix)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Debugf("Using statsdb at %s", statsDbFile)
+
+	opt := nutsdb.DefaultOptions
+	opt.Dir = statsDbFile
+	db, err := nutsdb.Open(opt)
+	if err != nil {
+		log.Fatal(fmt.Errorf("error reading stats database: %s", err))
+		os.Exit(1)
+	}
+
+	w := &WordStats{
+		db:        db,
+		Checked:   make(chan string, 1),
+		Corrected: make(chan [2]string, 1),
+	}
+	go w.addChecked()
+	go w.addCorrected()
+	return w
+}
+
+type wordAction struct {
+	Word       string
+	action     string
+	Correction string
+	Timestamp  string
 }
 
 func encode(logEntry *wordAction) []byte {
@@ -153,42 +188,6 @@ func decode(blob []byte) *wordAction {
 		log.Error(err)
 	}
 	return &logEntry
-}
-
-// OpenWordStats creates a new wordStats struct
-func OpenWordStats() *WordStats {
-	// open the on-disk database
-	statsDbFile, err := xdg.DataFile("autocorrector/stats.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Debugf("Using statsdb at %s", statsDbFile)
-	db, err := bolt.Open(statsDbFile, 0600, &bolt.Options{Timeout: 1 * time.Second})
-	if err != nil {
-		log.Fatal(fmt.Errorf("error reading stats database (is autocorrector still running?): %s", err))
-		os.Exit(1)
-	}
-	// make sure the top-level buckets exist
-	db.Update(func(tx *bolt.Tx) error {
-		_, err = tx.CreateBucketIfNotExists([]byte(countersBucket))
-		if err != nil {
-			return fmt.Errorf("create bucket: %s", err)
-		}
-		_, err = tx.CreateBucketIfNotExists([]byte(correctionsBucket))
-		if err != nil {
-			return fmt.Errorf("create bucket: %s", err)
-		}
-
-		return nil
-	})
-	w := &WordStats{
-		db:        db,
-		Checked:   make(chan string, 1),
-		Corrected: make(chan [2]string, 1),
-	}
-	go w.addChecked()
-	go w.addCorrected()
-	return w
 }
 
 func newWordAction(word string, action string, correction string) *wordAction {

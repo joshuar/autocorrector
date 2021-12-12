@@ -142,6 +142,7 @@ func (pb *patternBuf) write(r rune) {
 		pb.idx = 0
 	}
 	pb.buf.WriteRune(r)
+	pb.idx++
 }
 
 func (pb *patternBuf) match(s string) bool {
