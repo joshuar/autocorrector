@@ -20,7 +20,9 @@ const (
 
 // WordStats stores counters for words checked and words corrected
 type WordStats struct {
-	db *bolt.DB
+	db        *bolt.DB
+	Checked   chan string
+	Corrected chan [2]string
 }
 
 type wordAction struct {
@@ -30,24 +32,26 @@ type wordAction struct {
 	Timestamp  string
 }
 
-// AddChecked will increment the words checked counter in a wordStats struct
-func (w *WordStats) AddChecked(word string) {
-	checkedTotal := w.readAsInt("checkedTotal")
-	w.writeAsInt("checkedTotal", checkedTotal+1)
+func (w *WordStats) addChecked() {
+	for range w.Checked {
+		checkedTotal := w.readAsInt("checkedTotal")
+		w.writeAsInt("checkedTotal", checkedTotal+1)
+	}
 }
 
-// AddCorrected will increment the words corrected counter in a wordStats struct
-func (w *WordStats) AddCorrected(word string, correction string) {
-	correctedTotal := w.readAsInt("correctedTotal")
-	w.writeAsInt("correctedTotal", correctedTotal+1)
-	corrected := newWordAction(word, "corrected", correction)
-	err := w.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(correctionsBucket))
-		err := b.Put([]byte(corrected.Timestamp), encode(corrected))
-		return err
-	})
-	if err != nil {
-		log.Error(err)
+func (w *WordStats) addCorrected() {
+	for c := range w.Corrected {
+		correctedTotal := w.readAsInt("correctedTotal")
+		w.writeAsInt("correctedTotal", correctedTotal+1)
+		corrected := newWordAction(c[0], "corrected", c[1])
+		err := w.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(correctionsBucket))
+			err := b.Put([]byte(corrected.Timestamp), encode(corrected))
+			return err
+		})
+		if err != nil {
+			log.Error(err)
+		}
 	}
 }
 
@@ -177,9 +181,14 @@ func OpenWordStats() *WordStats {
 
 		return nil
 	})
-	return &WordStats{
-		db: db,
+	w := &WordStats{
+		db:        db,
+		Checked:   make(chan string, 1),
+		Corrected: make(chan [2]string, 1),
 	}
+	go w.addChecked()
+	go w.addCorrected()
+	return w
 }
 
 func newWordAction(word string, action string, correction string) *wordAction {

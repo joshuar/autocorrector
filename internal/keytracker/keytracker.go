@@ -42,7 +42,6 @@ func (kt *KeyTracker) Resume() error {
 func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
 	patternBuf := new(bytes.Buffer)
-	// var doubleSpace int
 	for k := range kt.kbdEvents {
 		if k.IsKeyRelease() {
 			patternBuf.WriteRune(k.AsRune)
