@@ -88,18 +88,14 @@ func init() {
 }
 
 func onReady() {
-	socket := control.ConnectSocket()
-	go socket.RecvData()
+	socket := control.CreateClient()
 
 	notify := notifications.NewNotificationsHandler()
 
 	stats := wordstats.OpenWordStats()
 	corrections := corrections.NewCorrections()
 
-	log.Debug("Client has started, asking server to resume tracking keys")
-	socket.ResumeServer()
-
-	go func() {
+	handleSocket := func() {
 		for msg := range socket.Data {
 			// case: recieved data on the socket
 			switch t := msg.(type) {
@@ -114,9 +110,9 @@ func onReady() {
 				log.Debugf("Unknown message received: %v", msg)
 			}
 		}
-	}()
+	}
 
-	go func() {
+	handleTrayIcon := func() {
 		systray.SetIcon(icon.Default)
 		systray.SetTooltip("Autocorrector corrects your typos")
 		mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
@@ -163,12 +159,13 @@ func onReady() {
 				}
 			case <-socket.Done:
 				log.Debug("Received done, restarting socket...")
-				socket = control.ConnectSocket()
-				go socket.RecvData()
-				socket.ResumeServer()
+				socket = control.CreateClient()
 			}
 		}
-	}()
+	}
+
+	go handleSocket()
+	go handleTrayIcon()
 }
 
 func onExit() {

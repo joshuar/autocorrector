@@ -46,9 +46,7 @@ var (
 			kbdTracker.StartEvents()
 
 			for {
-				socket := control.NewSocket(userFlag)
-				go socket.RecvData()
-
+				socket := control.CreateServer(userFlag)
 				for {
 					select {
 					case msg := <-socket.Data:
@@ -70,8 +68,7 @@ var (
 						}
 					case <-socket.Done:
 						log.Debug("Received done, restarting socket...")
-						socket = control.NewSocket(userFlag)
-						go socket.RecvData()
+						socket = control.CreateServer(userFlag)
 					case w := <-kbdTracker.TypedWord:
 						socket.SendWord(w.Word, "", w.Punct)
 					}

@@ -31,7 +31,8 @@ func (nh *notificationsHandler) Off() {
 	nh.showNotifications = false
 }
 
-// Send will generate an appropriately formatted notification and send it through the notification channel if notifications are enabled
+// Send will generate an appropriately formatted notification and send it
+// through the notification channel if notifications are enabled
 func (nh *notificationsHandler) Send(title string, message string) {
 	nh.notifications <- Notification{
 		Title:   title,
@@ -39,7 +40,8 @@ func (nh *notificationsHandler) Send(title string, message string) {
 	}
 }
 
-// NewNotificationsHandler will create a struct that opens a channel used for sending/receiving notifications and a bool to track whether they should be displayed
+// NewNotificationsHandler creates a new NotificationsHandler to
+// toggle the showing and format and display notifications for the app
 func NewNotificationsHandler() *notificationsHandler {
 	n := &notificationsHandler{
 		showNotifications: false,

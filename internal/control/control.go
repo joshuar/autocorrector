@@ -53,8 +53,8 @@ type Socket struct {
 	Done      chan bool
 }
 
-// NewSocket is used by the server command to create a new socket for communication between server and client
-func NewSocket(username string) *Socket {
+// CreateServer is used by the server command to create a new socket for communication between server and client
+func CreateServer(username string) *Socket {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Fatalf("Error in NewSocket: %v", r)
@@ -67,7 +67,7 @@ func NewSocket(username string) *Socket {
 	checkFatal(err)
 	log.Debug("Creating socket and waiting for client connection...")
 	listener := listenOnSocket(addr, username)
-	conn := AcceptOnSocket(listener)
+	conn := acceptOnSocket(listener)
 	s := &Socket{
 		addr:     addr,
 		Listener: listener,
@@ -77,7 +77,33 @@ func NewSocket(username string) *Socket {
 	}
 	log.Debug("Socket created.")
 	s.performHandshake()
+	go s.recvData()
+	return s
+}
 
+// ConnectSocket is used by the client to connect to the socket the server created for two-way communication
+func CreateClient() *Socket {
+	var s *Socket
+	tryMessage := func() error {
+		conn, err := net.Dial("unixpacket", SocketPath)
+		if err != nil {
+			return err
+		}
+		s = &Socket{
+			Conn: conn,
+			Data: make(chan interface{}),
+			Done: make(chan bool),
+		}
+		log.Debug("Socket connected.")
+		s.performHandshake()
+		return nil
+	}
+	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Errorf("Problem with connection backoff", err)
+	}
+	go s.recvData()
+	s.ResumeServer()
 	return s
 }
 
@@ -99,7 +125,7 @@ func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
 	return listener
 }
 
-func AcceptOnSocket(listener *net.UnixListener) net.Conn {
+func acceptOnSocket(listener *net.UnixListener) net.Conn {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Fatalf("Error in AcceptOnSocket: %v", r)
@@ -110,32 +136,7 @@ func AcceptOnSocket(listener *net.UnixListener) net.Conn {
 	return conn
 }
 
-// ConnectSocket is used by the client to connect to the socket the server created for two-way communication
-func ConnectSocket() *Socket {
-	var s *Socket
-	tryMessage := func() error {
-		conn, err := net.Dial("unixpacket", SocketPath)
-		if err != nil {
-			return err
-		}
-		s = &Socket{
-			Conn: conn,
-			Data: make(chan interface{}),
-			Done: make(chan bool),
-		}
-		log.Debug("Socket connected.")
-		s.performHandshake()
-		return nil
-	}
-	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
-	if err != nil {
-		log.Errorf("Problem with connection backoff", err)
-	}
-	return s
-}
-
-// RecvData handles recieving data on the connection, decoding the message and passing the decoded data to the Data channel (for external processing)
-func (s *Socket) RecvData() {
+func (s *Socket) recvData() {
 	for {
 		var packet Packet
 		gobDec := gob.NewDecoder(s.Conn)
