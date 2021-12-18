@@ -39,9 +39,7 @@ func (c *corrections) handler() {
 		case bool:
 			c.checkConfig()
 		case string:
-			log.Debugf("Checking %s for correction", d)
 			if found := c.findCorrection(d); found != "" {
-				log.Debugf("Found! %s", found)
 				c.correctionCh <- found
 			}
 		default:
