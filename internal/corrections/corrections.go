@@ -9,11 +9,12 @@ import (
 )
 
 type corrections struct {
-	correctionList    map[string]string
-	updateCorrections chan bool
+	correctionList map[string]string
+	controlCh      chan interface{}
+	correctionCh   chan string
 }
 
-func (c *corrections) FindCorrection(misspelling string) string {
+func (c *corrections) findCorrection(misspelling string) string {
 	return c.correctionList[misspelling]
 }
 
@@ -32,7 +33,24 @@ func (c *corrections) checkConfig() {
 	log.Debug("Config looks okay.")
 }
 
-func NewCorrections() *corrections {
+func (c *corrections) handler() {
+	for data := range c.controlCh {
+		switch d := data.(type) {
+		case bool:
+			c.checkConfig()
+		case string:
+			log.Debugf("Checking %s for correction", d)
+			if found := c.findCorrection(d); found != "" {
+				log.Debugf("Found! %s", found)
+				c.correctionCh <- found
+			}
+		default:
+			log.Debugf("Unknown data %T received: %v", d, d)
+		}
+	}
+}
+
+func NewCorrections() (chan interface{}, chan string) {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
@@ -42,22 +60,15 @@ func NewCorrections() *corrections {
 	}
 	log.Debugf("Using corrections config at %s", viper.ConfigFileUsed())
 	corrections := &corrections{
-		updateCorrections: make(chan bool),
+		controlCh:    make(chan interface{}),
+		correctionCh: make(chan string),
 	}
 	corrections.checkConfig()
-	go func() {
-		for {
-			switch {
-			case <-corrections.updateCorrections:
-				corrections.checkConfig()
-			}
-		}
-
-	}()
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		log.Debugf("Config file %s has changed, getting updates.", viper.ConfigFileUsed())
-		corrections.updateCorrections <- true
+		corrections.controlCh <- true
 	})
 	viper.WatchConfig()
-	return corrections
+	go corrections.handler()
+	return corrections.controlCh, corrections.correctionCh
 }
