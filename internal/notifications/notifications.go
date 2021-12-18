@@ -31,11 +31,11 @@ func (nh *notificationsHandler) handler() {
 
 // NewNotificationsHandler creates a new NotificationsHandler to
 // toggle the showing and format and display notifications for the app
-func NewNotificationsHandler() *chan interface{} {
+func NewNotificationsHandler() chan interface{} {
 	n := &notificationsHandler{
 		showNotifications: false,
 		data:              make(chan interface{}),
 	}
 	go n.handler()
-	return &n.data
+	return n.data
 }
