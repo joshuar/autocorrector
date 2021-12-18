@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"github.com/gen2brain/beeep"
+	log "github.com/sirupsen/logrus"
 )
 
 type Notification struct {
@@ -10,43 +11,31 @@ type Notification struct {
 
 type notificationsHandler struct {
 	showNotifications bool
-	notifications     chan Notification
+	data              chan interface{}
 }
 
-func (nh *notificationsHandler) show() {
-	for n := range nh.notifications {
-		if nh.showNotifications {
-			go beeep.Notify(n.Title, n.Message, "")
+func (nh *notificationsHandler) handler() {
+	for n := range nh.data {
+		switch n := n.(type) {
+		case bool:
+			nh.showNotifications = n
+		case Notification:
+			if nh.showNotifications {
+				go beeep.Notify(n.Title, n.Message, "")
+			}
+		default:
+			log.Debug("Unexpected data %T on notification channel: %v", n, n)
 		}
-	}
-}
-
-// On turns notifications on
-func (nh *notificationsHandler) On() {
-	nh.showNotifications = true
-}
-
-// Off turns notifications off
-func (nh *notificationsHandler) Off() {
-	nh.showNotifications = false
-}
-
-// Send will generate an appropriately formatted notification and send it
-// through the notification channel if notifications are enabled
-func (nh *notificationsHandler) Send(title string, message string) {
-	nh.notifications <- Notification{
-		Title:   title,
-		Message: message,
 	}
 }
 
 // NewNotificationsHandler creates a new NotificationsHandler to
 // toggle the showing and format and display notifications for the app
-func NewNotificationsHandler() *notificationsHandler {
+func NewNotificationsHandler() chan interface{} {
 	n := &notificationsHandler{
 		showNotifications: false,
-		notifications:     make(chan Notification),
+		data:              make(chan interface{}),
 	}
-	go n.show()
-	return n
+	go n.handler()
+	return n.data
 }

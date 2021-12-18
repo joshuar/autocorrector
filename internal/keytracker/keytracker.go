@@ -59,6 +59,9 @@ func (kt *KeyTracker) slurpWords() {
 				charBuf.WriteRune(k.AsRune)
 			case unicode.IsPunct(k.AsRune), unicode.IsSymbol(k.AsRune), unicode.IsSpace(k.AsRune):
 				// a punctuation mark, which would indicate a word has been typed, so handle that
+				if k.AsRune == '\n' {
+					charBuf.Reset()
+				}
 				if charBuf.Len() > 0 {
 					w := NewWord(charBuf.String(), "", k.AsRune)
 					charBuf.Reset()
