@@ -89,7 +89,7 @@ func init() {
 
 func onReady() {
 	socket := control.CreateClient()
-	notify := notifications.NewNotificationsHandler()
+	notifyCtrl := notifications.NewNotificationsHandler()
 
 	stats := wordstats.OpenWordStats()
 	correctionCtrl, correction := corrections.NewCorrections()
@@ -107,7 +107,7 @@ func onReady() {
 							t.Correction = c
 							socket.SendWord(t.Word, t.Correction, t.Punct)
 							stats.Corrected <- [2]string{t.Word, t.Correction}
-							notify <- notifications.Notification{
+							notifyCtrl <- notifications.Notification{
 								Title:   "Correction!",
 								Message: fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction),
 							}
@@ -148,11 +148,11 @@ func onReady() {
 				if mCorrections.Checked() {
 					mCorrections.Uncheck()
 					systray.SetIcon(icon.Default)
-					notify <- false
+					notifyCtrl <- false
 				} else {
 					mCorrections.Check()
-					notify <- true
-					notify <- notifications.Notification{
+					notifyCtrl <- true
+					notifyCtrl <- notifications.Notification{
 						Title:   "Showing Corrections",
 						Message: "Notifications for corrections will be shown as they are made",
 					}
