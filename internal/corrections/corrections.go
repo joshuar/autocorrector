@@ -14,8 +14,33 @@ type corrections struct {
 	correctionCh   chan string
 }
 
-func (c *corrections) findCorrection(misspelling string) string {
-	return c.correctionList[misspelling]
+// func (c *corrections) findCorrection(misspelling string) string {
+// 	return c.correctionList[misspelling]
+// }
+
+func (c *corrections) findCorrection(in <-chan string) <-chan string {
+	out := make(chan string)
+	go func() {
+		for i := range in {
+			value, ok := c.correctionList[i]
+			if ok {
+				out <- value
+			}
+		}
+		close(out)
+	}()
+	return out
+}
+
+func gen(words ...string) <-chan string {
+	out := make(chan string)
+	go func() {
+		for _, n := range words {
+			out <- n
+		}
+		close(out)
+	}()
+	return out
 }
 
 func (c *corrections) checkConfig() {
@@ -39,8 +64,11 @@ func (c *corrections) handler() {
 		case bool:
 			c.checkConfig()
 		case string:
-			if found := c.findCorrection(d); found != "" {
-				c.correctionCh <- found
+			log.Debugf("Checking %s", d)
+			for found := range c.findCorrection(gen(d)) {
+				if found != "" {
+					c.correctionCh <- found
+				}
 			}
 		default:
 			log.Debugf("Unknown data %T received: %v", d, d)
@@ -48,6 +76,9 @@ func (c *corrections) handler() {
 	}
 }
 
+// NewCorrections creates channels for sending words to check for corrections
+// (and signalling a config file reload) as well as a channel for recieving
+// corrected words
 func NewCorrections() (chan interface{}, chan string) {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {

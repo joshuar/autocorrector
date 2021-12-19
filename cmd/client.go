@@ -13,6 +13,7 @@ import (
 	"github.com/joshuar/autocorrector/assets/icon"
 	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/corrections"
+	"github.com/joshuar/autocorrector/internal/keytracker"
 	"github.com/joshuar/autocorrector/internal/notifications"
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	log "github.com/sirupsen/logrus"
@@ -98,20 +99,19 @@ func onReady() {
 		for msg := range socket.Data {
 			// case: recieved data on the socket
 			switch t := msg.(type) {
-			case *control.WordMsg:
+			case *keytracker.WordDetails:
 				stats.Checked <- t.Word
 				correctionCtrl <- t.Word
 				go func() {
 					for c := range correction {
 						if c != "" {
 							t.Correction = c
-							socket.SendWord(t.Word, t.Correction, t.Punct)
+							socket.SendWord(t)
 							stats.Corrected <- [2]string{t.Word, t.Correction}
 							notifyCtrl <- notifications.Notification{
 								Title:   "Correction!",
 								Message: fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction),
 							}
-
 						}
 					}
 				}()

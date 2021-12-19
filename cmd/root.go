@@ -40,13 +40,16 @@ var (
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			kbdTracker := keytracker.NewKeyTracker()
-			defer kbdTracker.CloseKeyTracker()
-
-			kbdTracker.StartEvents()
+			wordCh := make(chan *keytracker.WordDetails)
+			ktData := keytracker.NewKeyTracker(wordCh)
 
 			for {
 				socket := control.CreateServer(userFlag)
+				go func() {
+					for c := range wordCh {
+						socket.SendWord(c)
+					}
+				}()
 				for {
 					select {
 					case msg := <-socket.Data:
@@ -54,23 +57,21 @@ var (
 						case *control.StateMsg:
 							switch t.State {
 							case control.Pause:
-								kbdTracker.Pause()
+								ktData <- true
 							case control.Resume:
-								kbdTracker.Resume()
+								ktData <- false
 							default:
 								log.Debugf("Unknown state: %v", msg)
 							}
-						case *control.WordMsg:
-							w := keytracker.NewWord(t.Word, t.Correction, t.Punct)
-							kbdTracker.WordCorrection <- *w
+						case *keytracker.WordDetails:
+							log.Debugf("Recieved word %s (%s)", t.Word, t.Correction)
+							ktData <- t
 						default:
-							log.Debugf("Unknown message received: %v", msg)
+							log.Debugf("Unknown message %T received: %v", msg, msg)
 						}
 					case <-socket.Done:
 						log.Debug("Received done, restarting socket...")
 						socket = control.CreateServer(userFlag)
-					case w := <-kbdTracker.TypedWord:
-						socket.SendWord(w.Word, "", w.Punct)
 					}
 				}
 			}
