@@ -5,6 +5,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/joshuar/autocorrector/internal/control"
 	kbd "github.com/joshuar/gokbd"
 	log "github.com/sirupsen/logrus"
 )
@@ -13,41 +14,27 @@ import (
 // indicating when word/line delimiter characters are encountered or
 // backspace is pressed
 type KeyTracker struct {
-	kbd       *kbd.VirtualKeyboardDevice
-	kbdEvents <-chan kbd.KeyEvent
-	dataCh    chan interface{}
-	paused    bool
+	kbd              *kbd.VirtualKeyboardDevice
+	kbdEvents        <-chan kbd.KeyEvent
+	ctrlCh           chan interface{}
+	wordToCheck      chan string
+	correctionToMake chan *control.WordMsg
+	paused           bool
 }
 
-// Pause will stop corrections
-func (kt *KeyTracker) Pause() error {
-	log.Debug("Pausing keytracker...")
-	kt.paused = true
-	return nil
-}
-
-// Resume will resume corrections
-func (kt *KeyTracker) Resume() error {
-	log.Debug("Resuming keytracker...")
-	kt.paused = false
-	return nil
-}
-
-func (kt *KeyTracker) makeCorrections() {
-	for d := range kt.dataCh {
+func (kt *KeyTracker) controller() {
+	for d := range kt.ctrlCh {
 		switch d := d.(type) {
 		case bool:
 			log.Debugf("Keytracker is paused? %v", d)
 			kt.paused = d
-		case *WordDetails:
-			kt.correctWord(d)
 		default:
 			log.Debug("Unexpected data %T on notification channel: %v", d, d)
 		}
 	}
 }
 
-func (kt *KeyTracker) slurpWords(wordCh chan *WordDetails) {
+func (kt *KeyTracker) slurpWords() {
 	charBuf := new(bytes.Buffer)
 	patternBuf := newPatternBuf(3)
 	for k := range kt.kbdEvents {
@@ -78,9 +65,8 @@ func (kt *KeyTracker) slurpWords(wordCh chan *WordDetails) {
 				// handle that
 				if charBuf.Len() > 0 {
 					log.Debugf("character buffer is '%s'", charBuf.String())
-					w := NewWord(charBuf.String(), "", k.AsRune)
+					go kt.checkWord(charBuf.String(), k.AsRune)
 					charBuf.Reset()
-					wordCh <- w
 				}
 			default:
 				// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
@@ -91,8 +77,16 @@ func (kt *KeyTracker) slurpWords(wordCh chan *WordDetails) {
 	kt.CloseKeyTracker()
 }
 
+func (kt *KeyTracker) checkWord(w string, p rune) {
+	kt.wordToCheck <- w
+	c := <-kt.correctionToMake
+	details := NewWord(c.Word, c.Correction, p)
+	if details.Correction != "" {
+		go kt.correctWord(details)
+	}
+}
+
 func (kt *KeyTracker) correctWord(w *WordDetails) {
-	// for w := range kt.correctionCh {
 	// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
 	if !kt.paused {
 		log.Debugf("Making correction %s to %s", w.Word, w.Correction)
@@ -104,8 +98,9 @@ func (kt *KeyTracker) correctWord(w *WordDetails) {
 		// Insert the replacement.
 		// Type out the replacement and whatever punctuation/delimiter was after it.
 		kt.kbd.TypeString(w.Correction + string(w.Punct))
+		w.Word = ""
+		w.Correction = ""
 	}
-	// }
 }
 
 // CloseKeyTracker shuts down the channels used for key tracking
@@ -114,14 +109,16 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(in chan *WordDetails) chan interface{} {
+func NewKeyTracker() (chan interface{}, chan string, chan *control.WordMsg) {
 	kt := KeyTracker{
-		kbd:       kbd.NewVirtualKeyboard("autocorrector"),
-		kbdEvents: kbd.SnoopAllKeyboards(kbd.OpenKeyboardDevices()),
-		dataCh:    make(chan interface{}),
-		paused:    true,
+		kbd:              kbd.NewVirtualKeyboard("autocorrector"),
+		kbdEvents:        kbd.SnoopAllKeyboards(kbd.OpenKeyboardDevices()),
+		ctrlCh:           make(chan interface{}),
+		wordToCheck:      make(chan string),
+		correctionToMake: make(chan *control.WordMsg),
+		paused:           true,
 	}
-	go kt.slurpWords(in)
-	go kt.makeCorrections()
-	return kt.dataCh
+	go kt.controller()
+	go kt.slurpWords()
+	return kt.ctrlCh, kt.wordToCheck, kt.correctionToMake
 }

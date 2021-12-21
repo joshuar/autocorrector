@@ -2,6 +2,7 @@ package corrections
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
@@ -9,77 +10,36 @@ import (
 )
 
 type corrections struct {
-	correctionList map[string]string
-	controlCh      chan interface{}
-	correctionCh   chan string
+	mu              sync.Mutex
+	correctionsList map[string]string
 }
 
-// func (c *corrections) findCorrection(misspelling string) string {
-// 	return c.correctionList[misspelling]
-// }
-
-func (c *corrections) findCorrection(in <-chan string) <-chan string {
-	out := make(chan string)
-	go func() {
-		for i := range in {
-			value, ok := c.correctionList[i]
-			if ok {
-				out <- value
-			}
-		}
-		close(out)
-	}()
-	return out
-}
-
-func gen(words ...string) <-chan string {
-	out := make(chan string)
-	go func() {
-		for _, n := range words {
-			out <- n
-		}
-		close(out)
-	}()
-	return out
-}
-
-func (c *corrections) checkConfig() {
+func (c *corrections) updateCorrections() {
+	c.mu.Lock()
+	viper.Unmarshal(&c.correctionsList)
 	// check if any value is also a key
 	// in this case, we'd end up with replacing the typo then replacing the replacement
-	c.correctionList = make(map[string]string)
-	viper.Unmarshal(&c.correctionList)
-	for _, v := range c.correctionList {
+	for _, v := range c.correctionsList {
 		found := viper.GetString(v)
 		if found != "" {
 			log.Warnf("A replacement (%s) in the config is also listed as a typo. Deleting it to avoid recursive error.", v)
-			delete(c.correctionList, found)
+			delete(c.correctionsList, found)
 		}
 	}
-	log.Debug("Config looks okay.")
+	c.mu.Unlock()
 }
 
-func (c *corrections) handler() {
-	for data := range c.controlCh {
-		switch d := data.(type) {
-		case bool:
-			c.checkConfig()
-		case string:
-			log.Debugf("Checking %s", d)
-			for found := range c.findCorrection(gen(d)) {
-				if found != "" {
-					c.correctionCh <- found
-				}
-			}
-		default:
-			log.Debugf("Unknown data %T received: %v", d, d)
-		}
-	}
+func (c *corrections) CheckWord(word string) (string, bool) {
+	c.mu.Lock()
+	correction, ok := c.correctionsList[word]
+	c.mu.Unlock()
+	return correction, ok
 }
 
 // NewCorrections creates channels for sending words to check for corrections
 // (and signalling a config file reload) as well as a channel for recieving
 // corrected words
-func NewCorrections() (chan interface{}, chan string) {
+func NewCorrections() *corrections {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
@@ -89,15 +49,13 @@ func NewCorrections() (chan interface{}, chan string) {
 	}
 	log.Debugf("Using corrections config at %s", viper.ConfigFileUsed())
 	corrections := &corrections{
-		controlCh:    make(chan interface{}),
-		correctionCh: make(chan string),
+		correctionsList: make(map[string]string),
 	}
-	corrections.checkConfig()
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		log.Debugf("Config file %s has changed, getting updates.", viper.ConfigFileUsed())
-		corrections.controlCh <- true
+		corrections.updateCorrections()
 	})
 	viper.WatchConfig()
-	go corrections.handler()
-	return corrections.controlCh, corrections.correctionCh
+	corrections.updateCorrections()
+	return corrections
 }

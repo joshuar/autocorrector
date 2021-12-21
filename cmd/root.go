@@ -40,14 +40,13 @@ var (
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			wordCh := make(chan *keytracker.WordDetails)
-			ktData := keytracker.NewKeyTracker(wordCh)
+			keyTrackerCtrl, wordToCheck, correction := keytracker.NewKeyTracker()
 
 			for {
 				socket := control.CreateServer(userFlag)
 				go func() {
-					for c := range wordCh {
-						socket.SendWord(c)
+					for w := range wordToCheck {
+						socket.SendWord(&control.WordMsg{Word: w})
 					}
 				}()
 				for {
@@ -57,15 +56,14 @@ var (
 						case *control.StateMsg:
 							switch t.State {
 							case control.Pause:
-								ktData <- true
+								keyTrackerCtrl <- true
 							case control.Resume:
-								ktData <- false
+								keyTrackerCtrl <- false
 							default:
 								log.Debugf("Unknown state: %v", msg)
 							}
-						case *keytracker.WordDetails:
-							log.Debugf("Recieved word %s (%s)", t.Word, t.Correction)
-							ktData <- t
+						case *control.WordMsg:
+							correction <- t
 						default:
 							log.Debugf("Unknown message %T received: %v", msg, msg)
 						}

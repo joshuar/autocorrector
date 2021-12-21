@@ -13,7 +13,6 @@ import (
 	"strconv"
 
 	"github.com/cenkalti/backoff"
-	"github.com/joshuar/autocorrector/internal/keytracker"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -30,9 +29,13 @@ type StateMsg struct {
 	State
 }
 
+type WordMsg struct {
+	Word, Correction string
+}
+
 type Msg struct {
 	*StateMsg
-	*keytracker.WordDetails
+	*WordMsg
 }
 
 type Packet struct {
@@ -160,8 +163,8 @@ func (s *Socket) recvData() {
 			switch {
 			case msg.StateMsg != nil:
 				s.Data <- msg.StateMsg
-			case msg.WordDetails != nil:
-				s.Data <- msg.WordDetails
+			case msg.WordMsg != nil:
+				s.Data <- msg.WordMsg
 			default:
 				log.Warnf("Decoded but unhandled data received: %v", msg)
 			}
@@ -179,8 +182,8 @@ func (s *Socket) sendEncrypted(msgData interface{}) {
 				log.Errorf("Error encoding message: %s", err)
 				return err
 			}
-		case *keytracker.WordDetails:
-			if err := gobMsg.Encode(&Msg{WordDetails: t}); err != nil {
+		case *WordMsg:
+			if err := gobMsg.Encode(&Msg{WordMsg: t}); err != nil {
 				log.Errorf("Error encoding message: %s", err)
 				return err
 			}
@@ -228,7 +231,7 @@ func (s *Socket) ResumeServer() {
 }
 
 // SendState sends a message to the socket of type Word
-func (s *Socket) SendWord(w *keytracker.WordDetails) {
+func (s *Socket) SendWord(w *WordMsg) {
 	s.sendEncrypted(w)
 }
 
