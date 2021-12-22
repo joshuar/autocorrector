@@ -16,14 +16,14 @@ import (
 type KeyTracker struct {
 	kbd              *kbd.VirtualKeyboardDevice
 	kbdEvents        <-chan kbd.KeyEvent
-	ctrlCh           chan interface{}
-	wordToCheck      chan string
-	correctionToMake chan *control.WordMsg
+	Ctrl             chan interface{}
+	WordToCheck      chan string
+	CorrectionToMake chan *control.WordMsg
 	paused           bool
 }
 
 func (kt *KeyTracker) controller() {
-	for d := range kt.ctrlCh {
+	for d := range kt.Ctrl {
 		switch d := d.(type) {
 		case bool:
 			log.Debugf("Keytracker is paused? %v", d)
@@ -49,28 +49,25 @@ func (kt *KeyTracker) slurpWords() {
 				if charBuf.Len() > 0 {
 					charBuf.Truncate(charBuf.Len() - 1)
 				}
-			case unicode.IsDigit(k.AsRune), unicode.IsLetter(k.AsRune):
-				// a letter or number
-				charBuf.WriteRune(k.AsRune)
+			case k.AsRune == '\n' || unicode.IsControl(k.AsRune):
+				// newline or control character, reset the buffer
+				charBuf.Reset()
 			case unicode.IsPunct(k.AsRune), unicode.IsSymbol(k.AsRune), unicode.IsSpace(k.AsRune):
 				// a punctuation mark, which would indicate a word has been typed, so handle that
 				//
-				// but if the punctuation is a newline, just reset as it would
-				// be difficult to correct a command entered and already
-				// swallowed by something...
-				if k.AsRune == '\n' {
-					charBuf.Reset()
-				}
 				// most other punctuation should indicate end of word, so
 				// handle that
 				if charBuf.Len() > 0 {
-					log.Debugf("character buffer is '%s'", charBuf.String())
 					go kt.checkWord(charBuf.String(), k.AsRune)
 					charBuf.Reset()
 				}
 			default:
-				// for all other keys, including Ctrl, Meta, Alt, Shift, ignore
-				charBuf.Reset()
+				// case unicode.IsDigit(k.AsRune), unicode.IsLetter(k.AsRune):
+				// a letter or number
+				_, err := charBuf.WriteRune(k.AsRune)
+				if err != nil {
+					log.Errorf("Failed to write %s to character buffer: %v", k.AsRune, err)
+				}
 			}
 		}
 	}
@@ -78,8 +75,8 @@ func (kt *KeyTracker) slurpWords() {
 }
 
 func (kt *KeyTracker) checkWord(w string, p rune) {
-	kt.wordToCheck <- w
-	c := <-kt.correctionToMake
+	kt.WordToCheck <- w
+	c := <-kt.CorrectionToMake
 	details := NewWord(c.Word, c.Correction, p)
 	if details.Correction != "" {
 		go kt.correctWord(details)
@@ -87,7 +84,6 @@ func (kt *KeyTracker) checkWord(w string, p rune) {
 }
 
 func (kt *KeyTracker) correctWord(w *WordDetails) {
-	// Before making a correction, add some artificial latency, to ensure the user has actually finished typing
 	if !kt.paused {
 		log.Debugf("Making correction %s to %s", w.Word, w.Correction)
 		// Erase the existing word.
@@ -109,16 +105,16 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker() (chan interface{}, chan string, chan *control.WordMsg) {
-	kt := KeyTracker{
+func NewKeyTracker() *KeyTracker {
+	kt := &KeyTracker{
 		kbd:              kbd.NewVirtualKeyboard("autocorrector"),
 		kbdEvents:        kbd.SnoopAllKeyboards(kbd.OpenKeyboardDevices()),
-		ctrlCh:           make(chan interface{}),
-		wordToCheck:      make(chan string),
-		correctionToMake: make(chan *control.WordMsg),
+		Ctrl:             make(chan interface{}),
+		WordToCheck:      make(chan string),
+		CorrectionToMake: make(chan *control.WordMsg),
 		paused:           true,
 	}
 	go kt.controller()
 	go kt.slurpWords()
-	return kt.ctrlCh, kt.wordToCheck, kt.correctionToMake
+	return kt
 }

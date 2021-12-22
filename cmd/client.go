@@ -102,13 +102,13 @@ func onReady() {
 				correction, found := corrections.CheckWord(t.Word)
 				if found {
 					t.Correction = correction
-					socket.SendWord(t)
 					stats.Corrected <- [2]string{t.Word, t.Correction}
 					notifyCtrl <- notifications.Notification{
 						Title:   "Correction!",
 						Message: fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction),
 					}
 				}
+				socket.SendWord(t)
 			default:
 				log.Debugf("Unknown message %T received: %v", msg, msg)
 			}
