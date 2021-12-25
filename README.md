@@ -18,12 +18,13 @@ Autocorrector reads a TOML configuration file of key-values; the key being the t
 
 The following Go libraries and tools made autocorrector infinitely easier:
 
+- [gokbd](https://github.com/joshuar/gokbd): library using libevdev to talk to a keyboard on Linux. It allows snooping the keys pressed as well as typing out keys.
 - [Logrus](https://github.com/sirupsen/logrus):  structured logger for Go (golang), completely API compatible with the standard library logger.
 - [Viper](https://github.com/spf13/viper): Go configuration with fangs!
 - [Cobra](https://github.com/spf13/cobra): A Commander for modern Go CLI interactions.
 - [systray](https://github.com/getlantern/systray): A cross-platform Go library to place an icon and menu in the notification area.
 - [beeep](https://github.com/gen2brain/beeep): a cross-platform library for sending desktop notifications and beeps.
-- [bbolt](https://github.com/etcd-io/bbolt): a pure Go key/value store.
+- [nutsdb](https://xujiajun.cn/nutsdb/): simple, fast, embeddable and persistent key/value store written in pure Go..
 
 Check out more awesome Go things at the [Awesome Go List](https://github.com/avelino/awesome-go):
 
@@ -39,10 +40,11 @@ Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-error
 ## Installation (for rpm/deb)
 
 1. Download either the `.rpm` or `.deb` file and install using your package manager.
-2. Setup the client by running `autocorrector client setup` as your user.
-  - This will create `$HOME/.config/autocorrector/corrections.toml` (using the default corrections file).
-  - An auto-start entry will be created in `~/.config/autostart`.
-3. Setup the server by running `sudo autocorrector enable $USERNAME` (substitute `$USERNAME` for your user name).
-  - This will enable a service, `autocorrector@USERNAME` for the specified user.
+2. Set up the client: `autocorrector client setup`
+3. Set up the server: `sudo autocorrector enable $USERNAME` (substitute `$USERNAME` for your user name)
 4. Start the service with `systemctl start autocorrector@USERNAME`.
 5. Run `autocorrector client` or use the **autocorrector** menu entry in your desktop environment.
+
+## Configuration and additional details
+
+See [USAGE](USAGE.md)
