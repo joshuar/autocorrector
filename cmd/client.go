@@ -22,6 +22,7 @@ import (
 
 var (
 	correctionsFlag string
+	logStatsFlag    bool
 	clientCmd       = &cobra.Command{
 		Use:   "client",
 		Short: "Client creates tray icon for control and notifications",
@@ -77,6 +78,20 @@ var (
 			}
 		},
 	}
+	statsCmd = &cobra.Command{
+		Use:   "stats",
+		Short: "Print statistics from the database",
+		Long:  `Show stats such as number of checked/corrected words and accuracy.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			wordStats := wordstats.RunStats()
+			wordStats.ShowStats()
+			if logStatsFlag {
+				wordStats.ShowLog()
+			}
+			wordStats.CloseWordStats()
+			os.Exit(0)
+		},
+	}
 )
 
 func init() {
@@ -85,12 +100,15 @@ func init() {
 	clientCmd.Flags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
 	clientCmd.Flags().StringVar(&correctionsFlag, "corrections", "", fmt.Sprintf("list of corrections (default is %s/autocorrector/corrections.toml)", xdg.ConfigHome))
 	clientCmd.AddCommand(clientSetupCmd)
+	clientCmd.AddCommand(statsCmd)
+	statsCmd.Flags().BoolVarP(&logStatsFlag, "log", "l", false, "Show log of corrections")
+
 }
 
 func onReady() {
 	socket := control.CreateClient()
 	notifyCtrl := notifications.NewNotificationsHandler()
-	stats := wordstats.OpenWordStats()
+	stats := wordstats.RunStats()
 	corrections := corrections.NewCorrections()
 
 	handleSocket := func() {

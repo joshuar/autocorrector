@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 )
 
 type wordAction struct {
 	Word       string
-	action     string
+	Action     string
 	Correction string
-	Timestamp  string
+	Timestamp  time.Time
 }
 
 func encode(logEntry *wordAction) []byte {
@@ -19,6 +20,7 @@ func encode(logEntry *wordAction) []byte {
 	if err != nil {
 		log.Error(err)
 	}
+	spew.Dump(encoded)
 	return encoded
 }
 
@@ -34,8 +36,8 @@ func decode(blob []byte) *wordAction {
 func newWordAction(word string, action string, correction string) *wordAction {
 	return &wordAction{
 		Word:       word,
-		action:     action,
+		Action:     action,
 		Correction: correction,
-		Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		Timestamp:  time.Now().UTC(),
 	}
 }
