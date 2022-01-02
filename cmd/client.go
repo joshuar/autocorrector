@@ -58,23 +58,23 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			err := os.Mkdir(xdg.ConfigHome+"/autocorrector", 0755)
 			if e, ok := err.(*os.PathError); ok && e.Err == syscall.EEXIST {
-				log.Warn(err)
+				log.Warn("Configuration directory already exists")
 			} else {
-				log.Fatal(err)
+				log.Fatalf("Unable to create configuration directory: ", err)
 			}
 			defaultCorrections, err := ioutil.ReadFile("/usr/local/share/autocorrector/corrections.toml")
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Unable to read default corrections file: ", err)
 			}
 			err = ioutil.WriteFile(xdg.ConfigHome+"/autocorrector/corrections.toml", defaultCorrections, 0755)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Unable to write corrections file:", err)
 			}
 			err = os.Symlink("/usr/local/share/applications/autocorrector.desktop", xdg.ConfigHome+"/autostart/autocorrector.desktop")
 			if e, ok := err.(*os.LinkError); ok && e.Err == syscall.EEXIST {
-				log.Warn(err)
+				log.Warn("Autostart entry already exists")
 			} else {
-				log.Fatal(err)
+				log.Fatal("Unable to create autostart entry:", err)
 			}
 		},
 	}

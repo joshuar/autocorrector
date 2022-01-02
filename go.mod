@@ -9,7 +9,7 @@ require (
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
 	github.com/getlantern/systray v1.1.0
-	github.com/gopherjs/gopherjs v0.0.0-20211227152027-390fb3e174c8 // indirect
+	github.com/gopherjs/gopherjs v0.0.0-20211228203721-be292294a697 // indirect
 	github.com/joshuar/gokbd v0.0.0-20211219051147-2c5776a1b335
 	github.com/magefile/mage v1.12.1
 	github.com/sirupsen/logrus v1.8.1
