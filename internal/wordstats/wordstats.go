@@ -14,6 +14,8 @@ import (
 
 const (
 	countersBucket    = "counters"
+	correctedKey      = "correctedTotal"
+	checkedKey        = "checkedTotal"
 	correctionsBucket = "correctionsLog"
 	dbFileSuffix      = "autocorrector/stats.nutsdb"
 )
@@ -59,7 +61,7 @@ func (w *WordStats) get(key, bucket string) []byte {
 }
 
 func (w *WordStats) set(bucket, key string, value interface{}) {
-	log.Debugf("Writing to stats db: key = %s, value = %v", key, value)
+	log.Debugf("Writing to bucket %s: %s = %v", bucket, key, value)
 	var valueBuf []byte
 	switch v := value.(type) {
 	case uint64:
@@ -81,15 +83,15 @@ func (w *WordStats) set(bucket, key string, value interface{}) {
 
 func (w *WordStats) addChecked() {
 	for range w.Checked {
-		checkedTotal, _ := binary.Uvarint(w.get("checkedTotal", countersBucket))
-		w.set(countersBucket, "checkedTotal", checkedTotal+1)
+		checkedTotal, _ := binary.Uvarint(w.get(checkedKey, countersBucket))
+		w.set(countersBucket, checkedKey, checkedTotal+1)
 	}
 }
 
 func (w *WordStats) addCorrected() {
 	for c := range w.Corrected {
-		correctedTotal, _ := binary.Uvarint(w.get("correctedTotal", countersBucket))
-		w.set("correctedTotal", countersBucket, correctedTotal+1)
+		correctedTotal, _ := binary.Uvarint(w.get(correctedKey, countersBucket))
+		w.set(countersBucket, correctedKey, correctedTotal+1)
 		corrected := newWordAction(c[0], "corrected", c[1])
 		w.set(correctionsBucket, corrected.Timestamp.Format(time.RFC3339), corrected)
 	}
@@ -98,20 +100,20 @@ func (w *WordStats) addCorrected() {
 // CalcAccuracy returns the "accuracy" for the current session
 // accuracy is measured as how close to not correcting any words
 func (w *WordStats) CalcAccuracy() float64 {
-	checkedTotal, _ := binary.Uvarint(w.get("checkedTotal", countersBucket))
-	correctedTotal, _ := binary.Uvarint(w.get("correctedTotal", countersBucket))
+	checkedTotal, _ := binary.Uvarint(w.get(checkedKey, countersBucket))
+	correctedTotal, _ := binary.Uvarint(w.get(correctedKey, countersBucket))
 	return (1 - float64(correctedTotal)/float64(checkedTotal)) * 100
 }
 
 // GetCheckedTotal fetches the total number of checked words from the database
 func (w *WordStats) GetCheckedTotal() uint64 {
-	v, _ := binary.Uvarint(w.get("checkedTotal", countersBucket))
+	v, _ := binary.Uvarint(w.get(checkedKey, countersBucket))
 	return v
 }
 
 // GetCorrectedTotal fetches the total number of corrected words from the database
 func (w *WordStats) GetCorrectedTotal() uint64 {
-	v, _ := binary.Uvarint(w.get("correctedTotal", countersBucket))
+	v, _ := binary.Uvarint(w.get(correctedKey, countersBucket))
 	return v
 }
 
@@ -145,7 +147,7 @@ func (w *WordStats) ShowLog() {
 
 			for _, entry := range entries {
 				w := decode(entry.Value)
-				log.Infof("%s: %s: %s (%s)", string(entry.Key), w.Word, w.Correction, w.Action)
+				log.Infof("%s %s %s → %s", string(entry.Key), w.Action, w.Word, w.Correction)
 			}
 			return nil
 		})

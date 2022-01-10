@@ -56,20 +56,27 @@ var (
 		Short: "Set-up an autocorrector client",
 		Long:  "The client set-up command will make a copy of the default corrections file and create an autostart entry for the current user",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := os.Mkdir(xdg.ConfigHome+"/autocorrector", 0755)
-			if e, ok := err.(*os.PathError); ok && e.Err == syscall.EEXIST {
-				log.Warn("Configuration directory already exists")
-			} else {
-				log.Fatalf("Unable to create configuration directory: ", err)
+			configDirectory := xdg.ConfigHome + "/autocorrector"
+			log.Infof("Creating configuration directory %s", configDirectory)
+			err := os.Mkdir(configDirectory, 0755)
+			if e, ok := err.(*os.PathError); ok {
+				if e.Err == syscall.EEXIST {
+					log.Warn("Configuration directory already exists")
+				} else {
+					log.Fatalf("Unable to create configuration directory %s: ", configDirectory, err)
+				}
 			}
 			defaultCorrections, err := ioutil.ReadFile("/usr/local/share/autocorrector/corrections.toml")
 			if err != nil {
 				log.Fatalf("Unable to read default corrections file: ", err)
 			}
-			err = ioutil.WriteFile(xdg.ConfigHome+"/autocorrector/corrections.toml", defaultCorrections, 0755)
+			defaultCorrectionsFile := xdg.ConfigHome + "/autocorrector/corrections.toml"
+			log.Infof("Copying default configuration file %s", defaultCorrectionsFile)
+			err = ioutil.WriteFile(defaultCorrectionsFile, defaultCorrections, 0755)
 			if err != nil {
-				log.Fatalf("Unable to write corrections file:", err)
+				log.Fatalf("Unable to write corrections file %s:", defaultCorrectionsFile, err)
 			}
+			log.Infof("Creating autostart entry")
 			err = os.Symlink("/usr/local/share/applications/autocorrector.desktop", xdg.ConfigHome+"/autostart/autocorrector.desktop")
 			if e, ok := err.(*os.LinkError); ok && e.Err == syscall.EEXIST {
 				log.Warn("Autostart entry already exists")
