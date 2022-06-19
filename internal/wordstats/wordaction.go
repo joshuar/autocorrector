@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -20,7 +19,6 @@ func encode(logEntry *wordAction) []byte {
 	if err != nil {
 		log.Error(err)
 	}
-	spew.Dump(encoded)
 	return encoded
 }
 
