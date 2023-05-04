@@ -40,7 +40,7 @@ func New() *App {
 
 func (a *App) Run() {
 	_, cancelfunc := context.WithCancel(context.Background())
-	client.Start()
+	go client.Start()
 	a.setupSystemTray()
 	a.app.Run()
 	cancelfunc()

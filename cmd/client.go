@@ -37,7 +37,6 @@ var (
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			app := app.New()
-			fmt.Println("starting app...")
 			app.Run()
 		},
 	}
