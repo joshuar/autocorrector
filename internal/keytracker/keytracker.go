@@ -7,7 +7,7 @@ import (
 
 	"github.com/joshuar/autocorrector/internal/control"
 	kbd "github.com/joshuar/gokbd"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 // KeyTracker holds the channels for handling key presses and
@@ -26,10 +26,12 @@ func (kt *KeyTracker) controller() {
 	for d := range kt.Ctrl {
 		switch d := d.(type) {
 		case bool:
-			log.Debugf("Keytracker is paused? %v", d)
+			log.Debug().Caller().
+				Msgf("Keytracker is paused? %v", d)
 			kt.paused = d
 		default:
-			log.Debug("Unexpected data %T on notification channel: %v", d, d)
+			log.Debug().Caller().
+				Msgf("Unexpected data %T on notification channel: %v", d, d)
 		}
 	}
 }
@@ -66,7 +68,8 @@ func (kt *KeyTracker) slurpWords() {
 				// a letter or number
 				_, err := charBuf.WriteRune(k.AsRune)
 				if err != nil {
-					log.Errorf("Failed to write %s to character buffer: %v", k.AsRune, err)
+					log.Debug().Caller().Err(err).
+						Msgf("Failed to write %s to character buffer.", k.AsRune)
 				}
 			}
 		}
@@ -85,7 +88,7 @@ func (kt *KeyTracker) checkWord(w string, p rune) {
 
 func (kt *KeyTracker) correctWord(w *WordDetails) {
 	if !kt.paused {
-		log.Debugf("Making correction %s to %s", w.Word, w.Correction)
+		log.Debug().Msgf("Making correction %s to %s", w.Word, w.Correction)
 		// Erase the existing word.
 		// Effectively, hit backspace key for the length of the word plus the punctuation mark.
 		for i := 0; i <= utf8.RuneCountInString(w.Word); i++ {
@@ -108,7 +111,7 @@ func (kt *KeyTracker) CloseKeyTracker() {
 func NewKeyTracker() *KeyTracker {
 	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
 	if err != nil {
-		log.Panicf("Could not open a new virtual keyboard: %v", err)
+		log.Error().Err(err).Msg("Could not open a new virtual keyboard.")
 		return nil
 	}
 	kt := &KeyTracker{

@@ -2,7 +2,7 @@ package notifications
 
 import (
 	"github.com/gen2brain/beeep"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 type Notification struct {
@@ -24,7 +24,8 @@ func (nh *notificationsHandler) handler() {
 				go beeep.Notify(n.Title, n.Message, "")
 			}
 		default:
-			log.Debug("Unexpected data %T on notification channel: %v", n, n)
+			log.Debug().Caller().
+				Msgf("Unexpected data %T on notification channel: %v", n, n)
 		}
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 type wordAction struct {
@@ -17,7 +17,8 @@ type wordAction struct {
 func encode(logEntry *wordAction) []byte {
 	encoded, err := json.Marshal(logEntry)
 	if err != nil {
-		log.Error(err)
+		log.Debug().Caller().Err(err).
+			Msg("Could not encode.")
 	}
 	return encoded
 }
@@ -26,7 +27,8 @@ func decode(blob []byte) *wordAction {
 	var logEntry wordAction
 	err := json.Unmarshal(blob, &logEntry)
 	if err != nil {
-		log.Error(err)
+		log.Debug().Caller().Err(err).
+			Msg("Could not decode.")
 	}
 	return &logEntry
 }

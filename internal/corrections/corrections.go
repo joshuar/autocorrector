@@ -1,11 +1,10 @@
 package corrections
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -22,7 +21,7 @@ func (c *corrections) updateCorrections() {
 	for _, v := range c.correctionsList {
 		found := viper.GetString(v)
 		if found != "" {
-			log.Warnf("A replacement (%s) in the config is also listed as a typo. Deleting it to avoid recursive error.", v)
+			log.Warn().Msgf("A replacement (%s) in the config is also listed as a typo. Deleting it to avoid recursive error.", v)
 			delete(c.correctionsList, found)
 		}
 	}
@@ -42,17 +41,19 @@ func (c *corrections) CheckWord(word string) (string, bool) {
 func NewCorrections() *corrections {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Fatal("Could not find config file: ", viper.ConfigFileUsed())
+			log.Fatal().Msgf("Could not find config file: ", viper.ConfigFileUsed())
 		} else {
-			log.Fatal(fmt.Errorf("fatal error config file: %s", err))
+			log.Fatal().Err(err).Msg("Fatal error config file.")
 		}
 	}
-	log.Debugf("Using corrections config at %s", viper.ConfigFileUsed())
+	log.Debug().Caller().
+		Msgf("Using corrections config at %s", viper.ConfigFileUsed())
 	corrections := &corrections{
 		correctionsList: make(map[string]string),
 	}
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Debugf("Config file %s has changed, getting updates.", viper.ConfigFileUsed())
+		log.Debug().Caller().
+			Msgf("Config file %s has changed, getting updates.", viper.ConfigFileUsed())
 		corrections.updateCorrections()
 	})
 	viper.WatchConfig()

@@ -13,7 +13,7 @@ import (
 	"strconv"
 
 	"github.com/cenkalti/backoff"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/nacl/box"
 )
 
@@ -56,15 +56,18 @@ type Socket struct {
 func CreateServer(username string) *Socket {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Fatalf("Error in NewSocket: %v", r)
+			log.Debug().Caller().
+				Msgf("Error in NewSocket: %v", r)
 		}
 	}()
 	if err := os.Remove(SocketPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Warnf("Could not remove existing socket path: %s (%v)", SocketPath, err)
+		log.Debug().Caller().Err(err).
+			Msgf("Could not remove existing socket path: %s.", SocketPath)
 	}
 	addr, err := net.ResolveUnixAddr("unixpacket", SocketPath)
 	checkFatal(err)
-	log.Debug("Creating socket and waiting for client connection...")
+	log.Debug().Caller().
+		Msg("Creating socket and waiting for client connection...")
 	listener := listenOnSocket(addr, username)
 	conn := acceptOnSocket(listener)
 	s := &Socket{
@@ -74,7 +77,8 @@ func CreateServer(username string) *Socket {
 		Data:     make(chan interface{}),
 		Done:     make(chan bool),
 	}
-	log.Debug("Socket created.")
+	log.Debug().Caller().
+		Msg("Socket created.")
 	s.performHandshake()
 	go s.recvData()
 	return s
@@ -93,13 +97,15 @@ func CreateClient() *Socket {
 			Data: make(chan interface{}),
 			Done: make(chan bool),
 		}
-		log.Debug("Socket connected.")
+		log.Debug().Caller().
+			Msg("Socket connected.")
 		s.performHandshake()
 		return nil
 	}
 	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
 	if err != nil {
-		log.Errorf("Problem with connection backoff", err)
+		log.Debug().Caller().Err(err).
+			Msg("Problem with connection backoff.")
 	}
 	go s.recvData()
 	s.ResumeServer()
@@ -109,7 +115,8 @@ func CreateClient() *Socket {
 func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Fatalf("Error in listenOnSocket: %v", r)
+			log.Debug().Caller().
+				Msgf("Error in listenOnSocket: %v", r)
 		}
 	}()
 	listener, err := net.ListenUnix("unixpacket", addr)
@@ -119,7 +126,8 @@ func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
 	uid, _ := strconv.Atoi(u.Uid)
 	gid, _ := strconv.Atoi(u.Gid)
 	if err := os.Chown(SocketPath, uid, gid); err != nil {
-		log.Fatalf("Unable to change ownership on socket file %s to %s:%s : %s", SocketPath, 0, gid, err)
+		log.Debug().Caller().Err(err).
+			Msgf("Unable to change ownership on socket file %s to %s:%s : %s", SocketPath, 0, gid, err)
 	}
 	return listener
 }
@@ -127,7 +135,8 @@ func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
 func acceptOnSocket(listener *net.UnixListener) net.Conn {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Fatalf("Error in AcceptOnSocket: %v", r)
+			log.Debug().Caller().
+				Msgf("Error in AcceptOnSocket: %v", r)
 		}
 	}()
 	conn, err := listener.Accept()
@@ -140,9 +149,10 @@ func (s *Socket) recvData() {
 		var packet Packet
 		gobDec := gob.NewDecoder(s.Conn)
 		if err := gobDec.Decode(&packet); err != nil {
-			log.Errorf("Read error: %s", err)
+			log.Debug().Caller().Err(err).Msg("Read error.")
 			if err == io.EOF {
-				log.Debug("Sending done channel to indicate restart needed")
+				log.Debug().Caller().
+					Msg("Sending done channel to indicate restart needed.")
 				s.Done <- true
 				break
 			}
@@ -153,7 +163,8 @@ func (s *Socket) recvData() {
 
 		decryptedMsg, ok := box.OpenAfterPrecomputation(nil, encrypted, &nonce, &s.sharedKey)
 		if !ok {
-			log.Warn("Failed to decrypt packet")
+			log.Debug().Caller().
+				Msg("Failed to decrypt packet")
 		}
 		buf := bytes.NewBuffer(decryptedMsg)
 		var msg Msg
@@ -166,7 +177,8 @@ func (s *Socket) recvData() {
 			case msg.WordMsg != nil:
 				s.Data <- msg.WordMsg
 			default:
-				log.Warnf("Decoded but unhandled data received: %v", msg)
+				log.Debug().Caller().
+					Msgf("Decoded but unhandled data received: %v", msg)
 			}
 		}
 	}
@@ -179,12 +191,14 @@ func (s *Socket) sendEncrypted(msgData interface{}) {
 		switch t := msgData.(type) {
 		case *StateMsg:
 			if err := gobMsg.Encode(&Msg{StateMsg: t}); err != nil {
-				log.Errorf("Error encoding message: %s", err)
+				log.Debug().Caller().Err(err).
+					Msg("Error encoding message.")
 				return err
 			}
 		case *WordMsg:
 			if err := gobMsg.Encode(&Msg{WordMsg: t}); err != nil {
-				log.Errorf("Error encoding message: %s", err)
+				log.Debug().Caller().Err(err).
+					Msg("Error encoding message.")
 				return err
 			}
 		default:
@@ -201,14 +215,16 @@ func (s *Socket) sendEncrypted(msgData interface{}) {
 		}
 		gobEnc := gob.NewEncoder(s.Conn)
 		if err := gobEnc.Encode(&packet); err != nil {
-			log.Errorf("Write error: %s", err)
+			log.Debug().Caller().Err(err).
+				Msg("Write error.")
 			return err
 		}
 		return nil
 	}
 	err := backoff.Retry(tryMessage, backoff.NewExponentialBackOff())
 	if err != nil {
-		log.Errorf("Problem with connection backoff", err)
+		log.Debug().Caller().Err(err).
+			Msg("Problem with connection backoff.")
 	}
 }
 
@@ -238,11 +254,12 @@ func (s *Socket) SendWord(w *WordMsg) {
 func (s *Socket) performHandshake() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Fatalf("Error in performHandShake: %v", r)
+			log.Debug().Caller().
+				Msgf("Error in performHandShake: %v", r)
 		}
 	}()
 
-	log.Debug("Performing handshake...")
+	log.Debug().Caller().Msg("Performing handshake...")
 
 	var peerKey [32]byte
 
@@ -258,7 +275,7 @@ func (s *Socket) performHandshake() {
 	copy(peerKey[:], peerKeyArray)
 
 	box.Precompute(&s.sharedKey, &peerKey, privateKey)
-	log.Debug("Handshake complete...")
+	log.Debug().Caller().Msg("Handshake complete...")
 }
 
 func checkFatal(err error) {

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/nutsdb/nutsdb"
 )
@@ -31,14 +31,16 @@ func openDB() *nutsdb.DB {
 	// open the on-disk database
 	statsDbFile, err := xdg.DataFile(dbFileSuffix)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Could not open stats db.")
 	}
-	log.Debugf("Using statsdb at %s", statsDbFile)
+	log.Debug().Caller().
+		Msgf("Using statsdb at %s", statsDbFile)
 	opt := nutsdb.DefaultOptions
 	opt.Dir = statsDbFile
 	db, err := nutsdb.Open(opt)
 	if err != nil {
-		log.Fatal(fmt.Errorf("error reading stats database: %s", err))
+		log.Fatal().Err(err).
+			Msg("Error reading stats database.")
 		os.Exit(1)
 	}
 	return db
@@ -55,13 +57,15 @@ func (w *WordStats) get(key, bucket string) []byte {
 			}
 			return nil
 		}); err != nil {
-		log.Warnf("Couldn't get value for key %s from bucket %s: %v", key, bucket, err)
+		log.Debug().Caller().
+			Msgf("Couldn't get value for key %s from bucket %s: %v", key, bucket, err)
 	}
 	return value
 }
 
 func (w *WordStats) set(bucket, key string, value interface{}) {
-	log.Debugf("Writing to bucket %s: %s = %v", bucket, key, value)
+	log.Debug().Caller().
+		Msgf("Writing to bucket %s: %s = %v", bucket, key, value)
 	var valueBuf []byte
 	switch v := value.(type) {
 	case uint64:
@@ -77,7 +81,8 @@ func (w *WordStats) set(bucket, key string, value interface{}) {
 			}
 			return nil
 		}); err != nil {
-		log.Warnf("Couldn't set value for key %s from bucket %s: %v", key, bucket, err)
+		log.Debug().Caller().Err(err).
+			Msgf("Couldn't set value for key %s from bucket %s.", key, bucket)
 	}
 }
 
@@ -133,7 +138,7 @@ func (w *WordStats) GetStats() string {
 
 // ShowStats logs top-level statistics about corrections
 func (w *WordStats) ShowStats() {
-	log.Info(w.GetStats())
+	log.Info().Msg(w.GetStats())
 }
 
 // ShowLog prints out the full log of corrections history
@@ -142,12 +147,12 @@ func (w *WordStats) ShowLog() {
 		func(tx *nutsdb.Tx) error {
 			entries, err := tx.GetAll(correctionsBucket)
 			if err != nil {
-				log.Warnf("Couldn't fetch entries from corrections log: %v", err)
+				log.Warn().Err(err).Msg("Couldn't fetch entries from corrections log.")
 			}
 
 			for _, entry := range entries {
 				w := decode(entry.Value)
-				log.Infof("%s %s %s → %s", string(entry.Key), w.Action, w.Word, w.Correction)
+				log.Info().Msgf("%s %s %s → %s", string(entry.Key), w.Action, w.Word, w.Correction)
 			}
 			return nil
 		})
