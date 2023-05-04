@@ -12,7 +12,7 @@ import (
 	"github.com/joshuar/autocorrector/internal/corrections"
 	"github.com/joshuar/autocorrector/internal/notifications"
 	"github.com/joshuar/autocorrector/internal/wordstats"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func Start() {
@@ -38,7 +38,7 @@ func Start() {
 				}
 				socket.SendWord(t)
 			default:
-				log.Debugf("Unknown message %T received: %v", msg, msg)
+				log.Debug().Msgf("Unknown message %T received: %v", msg, msg)
 			}
 		}
 	}
