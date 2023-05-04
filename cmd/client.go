@@ -5,15 +5,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"syscall"
 
 	"github.com/adrg/xdg"
-	"github.com/getlantern/systray"
-	"github.com/joshuar/autocorrector/assets/icon"
-	"github.com/joshuar/autocorrector/internal/control"
-	"github.com/joshuar/autocorrector/internal/corrections"
-	"github.com/joshuar/autocorrector/internal/notifications"
+	"github.com/joshuar/autocorrector/internal/app"
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -48,7 +43,9 @@ var (
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			systray.Run(onReady, onExit)
+			app := app.New()
+			fmt.Println("starting app...")
+			app.Run()
 		},
 	}
 	clientSetupCmd = &cobra.Command{
@@ -109,95 +106,4 @@ func init() {
 	clientCmd.AddCommand(clientSetupCmd)
 	clientCmd.AddCommand(statsCmd)
 	statsCmd.Flags().BoolVarP(&logStatsFlag, "log", "l", false, "Show log of corrections")
-
-}
-
-func onReady() {
-	socket := control.CreateClient()
-	notifyCtrl := notifications.NewNotificationsHandler()
-	stats := wordstats.RunStats()
-	corrections := corrections.NewCorrections()
-
-	handleSocket := func() {
-		for msg := range socket.Data {
-			// case: recieved data on the socket
-			switch t := msg.(type) {
-			case *control.WordMsg:
-				stats.Checked <- t.Word
-				correction, found := corrections.CheckWord(t.Word)
-				if found {
-					t.Correction = correction
-					stats.Corrected <- [2]string{t.Word, t.Correction}
-					notifyCtrl <- notifications.Notification{
-						Title:   "Correction!",
-						Message: fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction),
-					}
-				}
-				socket.SendWord(t)
-			default:
-				log.Debugf("Unknown message %T received: %v", msg, msg)
-			}
-		}
-	}
-
-	handleTrayIcon := func() {
-		systray.SetIcon(icon.Default)
-		systray.SetTooltip("Autocorrector corrects your typos")
-		mCorrections := systray.AddMenuItemCheckbox("Show Corrections", "Show corrections as they happen", false)
-		mEnabled := systray.AddMenuItemCheckbox("Enabled", "Enable autocorrector", true)
-		mStats := systray.AddMenuItem("Show Stats", "Updates current stats")
-		mStatsDisplay := mStats.AddSubMenuItem("Stats", "Latest stats grab")
-		mEdit := systray.AddMenuItem("Edit", "Edit the list of corrections")
-		systray.AddSeparator()
-		mQuit := systray.AddMenuItem("Quit", "Quit autocorrector")
-
-		for {
-			select {
-			case <-mEnabled.ClickedCh:
-				if mEnabled.Checked() {
-					mEnabled.Uncheck()
-					socket.PauseServer()
-					systray.SetIcon(icon.Disabled)
-				} else {
-					mEnabled.Check()
-					socket.ResumeServer()
-					systray.SetIcon(icon.Default)
-				}
-			case <-mCorrections.ClickedCh:
-				if mCorrections.Checked() {
-					mCorrections.Uncheck()
-					systray.SetIcon(icon.Default)
-					notifyCtrl <- false
-				} else {
-					mCorrections.Check()
-					notifyCtrl <- true
-					notifyCtrl <- notifications.Notification{
-						Title:   "Showing Corrections",
-						Message: "Notifications for corrections will be shown as they are made",
-					}
-					systray.SetIcon(icon.Notifying)
-				}
-			case <-mQuit.ClickedCh:
-				log.Info("Requesting quit")
-				socket.PauseServer()
-				systray.Quit()
-			case <-mStats.ClickedCh:
-				mStatsDisplay.SetTitle(stats.GetStats())
-			case <-mEdit.ClickedCh:
-				cmd := exec.Command("xdg-open", viper.ConfigFileUsed())
-				if err := cmd.Run(); err != nil {
-					log.Error(err)
-				}
-			case <-socket.Done:
-				log.Debug("Received done, restarting socket...")
-				socket = control.CreateClient()
-			}
-		}
-	}
-
-	go handleSocket()
-	go handleTrayIcon()
-}
-
-func onExit() {
 }
