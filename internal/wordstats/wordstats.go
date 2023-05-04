@@ -9,7 +9,7 @@ import (
 	"github.com/adrg/xdg"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/xujiajun/nutsdb"
+	"github.com/nutsdb/nutsdb"
 )
 
 const (
