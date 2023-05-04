@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"syscall"
 
@@ -23,15 +22,8 @@ var (
 		Short: "Client creates tray icon for control and notifications",
 		Long:  `With the client running, you can pause correction and see notifications.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if debugFlag {
-				log.SetLevel(log.DebugLevel)
-			}
-			if profileFlag {
-				go func() {
-					log.Info(http.ListenAndServe("localhost:6061", nil))
-				}()
-				log.Info("Profiling is enabled and available at localhost:6061")
-			}
+			setDebugging()
+			setProfiling()
 			if correctionsFlag != "" {
 				log.Debug("Using config file specified on command-line: ", correctionsFlag)
 				viper.SetConfigFile(correctionsFlag)

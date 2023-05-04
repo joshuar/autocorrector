@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/exec"
-	"os/user"
 
 	"github.com/joshuar/autocorrector/internal/server"
 	log "github.com/sirupsen/logrus"
@@ -21,22 +19,9 @@ var (
 		Short: "Autocorrect typos and spelling mistakes.",
 		Long:  `Autocorrector is a tool similar to the word replacement functionality in Autokey or AutoHotKey.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			currentUser, err := user.Current()
-			if err != nil {
-				log.Fatalf("Could fetch user that ran us: %s", err)
-			}
-			if currentUser.Username != "root" {
-				log.Fatal("autocorrector server must be run as root")
-			}
-			if debugFlag {
-				log.SetLevel(log.DebugLevel)
-			}
-			if profileFlag {
-				go func() {
-					log.Info(http.ListenAndServe("localhost:6060", nil))
-				}()
-				log.Info("Profiling is enabled and available at localhost:6060")
-			}
+			ensureEUID()
+			setDebugging()
+			setProfiling()
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			server.Run(userFlag)
@@ -48,6 +33,7 @@ var (
 		Long:  "Copies and enables an autocorrector systemd service for the specified user",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			ensureEUID()
 			systemdReload := exec.Command("systemctl", "daemon-reload")
 			err := systemdReload.Run()
 			if err != nil {
