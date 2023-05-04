@@ -7,23 +7,34 @@ package cmd
 
 import (
 	"net/http"
+	"os"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/pkgerrors"
 )
+
+func setLogging() {
+	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+}
 
 func setDebugging() {
 	if debugFlag {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		log.Debug().Msg("Debug logging enabled.")
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 }
 
 func setProfiling() {
 	if profileFlag {
 		go func() {
-			log.Info(http.ListenAndServe("localhost:6061", nil))
+			log.Debug().Err(http.ListenAndServe("localhost:6061", nil))
 		}()
-		log.Info("Profiling is enabled and available at localhost:6061")
+		log.Debug().Msg("Profiling is enabled and available at localhost:6061")
 	}
 }
 
@@ -33,6 +44,6 @@ func ensureEUID() {
 	egid := syscall.Getegid()
 	// gid := syscall.Getgid()
 	if euid != 0 || egid != 0 || uid != 0 {
-		log.Fatalf("autocorrector server must be run as root.")
+		log.Fatal().Msg("autocorrector server must be run as root.")
 	}
 }

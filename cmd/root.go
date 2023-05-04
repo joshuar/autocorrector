@@ -6,7 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/joshuar/autocorrector/internal/server"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +19,7 @@ var (
 		Short: "Autocorrect typos and spelling mistakes.",
 		Long:  `Autocorrector is a tool similar to the word replacement functionality in Autokey or AutoHotKey.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			setLogging()
 			ensureEUID()
 			setDebugging()
 			setProfiling()
@@ -37,14 +38,12 @@ var (
 			systemdReload := exec.Command("systemctl", "daemon-reload")
 			err := systemdReload.Run()
 			if err != nil {
-				log.Warn(err)
-				log.Warnf("Try manually running the following command and fix any errors it returns: %s", systemdReload.String())
+				log.Warn().Err(err).Msgf("Try manually running the following command and fix any errors it returns: %s", systemdReload.String())
 			}
 			systemdEnable := exec.Command("systemctl", "enable", "autocorrector@"+args[0])
 			err = systemdEnable.Run()
 			if err != nil {
-				log.Warn(err)
-				log.Warnf("Try manually running the following command and fix any errors it returns: %s", systemdEnable.String())
+				log.Warn().Err(err).Msgf("Try manually running the following command and fix any errors it returns: %s", systemdEnable.String())
 			}
 		},
 	}
@@ -54,7 +53,7 @@ var (
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		log.Panic().Err(err).Msg("Could not start.")
 		os.Exit(1)
 	}
 }

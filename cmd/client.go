@@ -9,7 +9,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/joshuar/autocorrector/internal/app"
 	"github.com/joshuar/autocorrector/internal/wordstats"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -22,10 +22,11 @@ var (
 		Short: "Client creates tray icon for control and notifications",
 		Long:  `With the client running, you can pause correction and see notifications.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			setLogging()
 			setDebugging()
 			setProfiling()
 			if correctionsFlag != "" {
-				log.Debug("Using config file specified on command-line: ", correctionsFlag)
+				log.Info().Msgf("Using config file specified on command-line: ", correctionsFlag)
 				viper.SetConfigFile(correctionsFlag)
 			} else {
 				viper.SetConfigName("corrections")
@@ -46,31 +47,31 @@ var (
 		Long:  "The client set-up command will make a copy of the default corrections file and create an autostart entry for the current user",
 		Run: func(cmd *cobra.Command, args []string) {
 			configDirectory := xdg.ConfigHome + "/autocorrector"
-			log.Infof("Creating configuration directory %s", configDirectory)
+			log.Info().Msgf("Creating configuration directory %s.", configDirectory)
 			err := os.Mkdir(configDirectory, 0755)
 			if e, ok := err.(*os.PathError); ok {
 				if e.Err == syscall.EEXIST {
-					log.Warn("Configuration directory already exists")
+					log.Warn().Msg("Configuration directory already exists")
 				} else {
-					log.Fatalf("Unable to create configuration directory %s: ", configDirectory, err)
+					log.Panic().Err(err).Msgf("Unable to create configuration directory %s.", configDirectory)
 				}
 			}
 			defaultCorrections, err := ioutil.ReadFile("/usr/local/share/autocorrector/corrections.toml")
 			if err != nil {
-				log.Fatalf("Unable to read default corrections file: ", err)
+				log.Panic().Err(err).Msg("Unable to read default corrections file.")
 			}
 			defaultCorrectionsFile := xdg.ConfigHome + "/autocorrector/corrections.toml"
-			log.Infof("Copying default configuration file %s", defaultCorrectionsFile)
+			log.Info().Msgf("Copying default configuration file %s.", defaultCorrectionsFile)
 			err = ioutil.WriteFile(defaultCorrectionsFile, defaultCorrections, 0755)
 			if err != nil {
-				log.Fatalf("Unable to write corrections file %s:", defaultCorrectionsFile, err)
+				log.Panic().Err(err).Msgf("Unable to write corrections file %s.", defaultCorrectionsFile)
 			}
-			log.Infof("Creating autostart entry")
+			log.Info().Msg("Creating autostart entry")
 			err = os.Symlink("/usr/local/share/applications/autocorrector.desktop", xdg.ConfigHome+"/autostart/autocorrector.desktop")
 			if e, ok := err.(*os.LinkError); ok && e.Err == syscall.EEXIST {
-				log.Warn("Autostart entry already exists")
+				log.Warn().Msg("Autostart entry already exists")
 			} else {
-				log.Fatal("Unable to create autostart entry:", err)
+				log.Panic().Err(err).Msg("Unable to create autostart entry.")
 			}
 		},
 	}
