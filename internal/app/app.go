@@ -9,9 +9,8 @@ import (
 	"context"
 	_ "embed"
 
-	"github.com/joshuar/autocorrector/internal/server"
-
 	"fyne.io/fyne/v2"
+	"github.com/joshuar/autocorrector/internal/client"
 )
 
 //go:generate sh -c "printf %s $(git tag | tail -1) > VERSION"
@@ -41,7 +40,7 @@ func New() *App {
 
 func (a *App) Run() {
 	_, cancelfunc := context.WithCancel(context.Background())
-	go server.Start()
+	client.Start()
 	a.setupSystemTray()
 	a.app.Run()
 	cancelfunc()
