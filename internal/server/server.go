@@ -8,7 +8,7 @@ package server
 import (
 	"github.com/joshuar/autocorrector/internal/control"
 	"github.com/joshuar/autocorrector/internal/keytracker"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func Run(user string) {
@@ -32,15 +32,15 @@ func Run(user string) {
 					case control.Resume:
 						keyTracker.Ctrl <- false
 					default:
-						log.Debugf("Unknown state: %v", msg)
+						log.Debug().Msgf("Unknown state: %v", msg)
 					}
 				case *control.WordMsg:
 					keyTracker.CorrectionToMake <- t
 				default:
-					log.Debugf("Unknown message %T received: %v", msg, msg)
+					log.Debug().Msgf("Unknown message %T received: %v", msg, msg)
 				}
 			case <-socket.Done:
-				log.Debug("Received done, restarting socket...")
+				log.Debug().Msg("Received done, restarting socket...")
 				socket = control.CreateServer(user)
 			}
 		}
