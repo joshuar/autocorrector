@@ -106,9 +106,14 @@ func (kt *KeyTracker) CloseKeyTracker() {
 
 // NewKeyTracker creates a new keyTracker struct
 func NewKeyTracker() *KeyTracker {
+	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
+	if err != nil {
+		log.Panicf("Could not open a new virtual keyboard: %v", err)
+		return nil
+	}
 	kt := &KeyTracker{
-		kbd:              kbd.NewVirtualKeyboard("autocorrector"),
-		kbdEvents:        kbd.SnoopAllKeyboards(kbd.OpenKeyboardDevices()),
+		kbd:              vKbd,
+		kbdEvents:        kbd.SnoopAllKeyboards(kbd.OpenAllKeyboardDevices()),
 		Ctrl:             make(chan interface{}),
 		WordToCheck:      make(chan string),
 		CorrectionToMake: make(chan *control.WordMsg),
