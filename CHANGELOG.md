@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/joshuar/autocorrector/compare/v1.0.0...v1.0.1) (2023-05-05)
+
+
+### Bug Fixes
+
+* **build:** fix dependency error for rpm ([aa8917a](https://github.com/joshuar/autocorrector/commit/aa8917a581127b58415c6511d9fa0e537ce4e3d2))
+
 ## [1.0.0](https://github.com/joshuar/autocorrector/compare/v0.4.9...v1.0.0) (2023-05-05)
 
 
