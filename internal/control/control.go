@@ -12,7 +12,7 @@ import (
 	"os/user"
 	"strconv"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/nacl/box"
 )
