@@ -81,7 +81,7 @@ nfpms:
           - libXrandr
           - libXxf86vm
           - libXi
-          - libxcursor
+          - libXcursor
           - libXinerama
     id: github.com/joshuar/autocorrector
     formats:

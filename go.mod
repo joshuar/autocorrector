@@ -7,7 +7,6 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/joshuar/gokbd v0.1.1
-	github.com/magefile/mage v1.14.0
 	github.com/nutsdb/nutsdb v0.12.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
