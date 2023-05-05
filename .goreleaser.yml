@@ -35,7 +35,7 @@ nfpms:
           - libXrandr
           - libXxf86vm
           - libXi
-          - libxcursor
+          - libXcursor
           - libXinerama
       deb:
         dependencies:
