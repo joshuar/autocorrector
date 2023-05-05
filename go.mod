@@ -4,7 +4,6 @@ go 1.20
 
 require (
 	github.com/adrg/xdg v0.4.0
-	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/joshuar/gokbd v0.1.1
 	github.com/nutsdb/nutsdb v0.12.0
@@ -37,6 +36,7 @@ require (
 require (
 	fyne.io/fyne/v2 v2.3.4
 	github.com/bwmarrin/snowflake v0.3.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
