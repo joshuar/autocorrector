@@ -18,7 +18,9 @@ func Run(user string) {
 		socket := control.CreateServer(user)
 		go func() {
 			for w := range keyTracker.WordToCheck {
-				socket.SendWord(&control.WordMsg{Word: w})
+				if !keyTracker.Paused() {
+					socket.SendWord(&control.WordMsg{Word: w})
+				}
 			}
 		}()
 		for {
@@ -41,6 +43,7 @@ func Run(user string) {
 				}
 			case <-socket.Done:
 				log.Debug().Msg("Received done, restarting socket...")
+				keyTracker.Ctrl <- true
 				socket = control.CreateServer(user)
 			}
 		}

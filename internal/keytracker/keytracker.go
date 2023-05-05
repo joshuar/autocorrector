@@ -102,6 +102,10 @@ func (kt *KeyTracker) correctWord(w *WordDetails) {
 	}
 }
 
+func (kt *KeyTracker) Paused() bool {
+	return kt.paused
+}
+
 // CloseKeyTracker shuts down the channels used for key tracking
 func (kt *KeyTracker) CloseKeyTracker() {
 	kt.kbd.Close()
