@@ -22,23 +22,29 @@ func Start() {
 	corrections := corrections.NewCorrections()
 
 	handleSocket := func() {
-		for msg := range socket.Data {
-			// case: recieved data on the socket
-			switch t := msg.(type) {
-			case *control.WordMsg:
-				stats.Checked <- t.Word
-				correction, found := corrections.CheckWord(t.Word)
-				if found {
-					t.Correction = correction
-					stats.Corrected <- [2]string{t.Word, t.Correction}
-					notifyCtrl <- notifications.Notification{
-						Title:   "Correction!",
-						Message: fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction),
+		for {
+			select {
+			case msg := <-socket.Data:
+				// case: recieved data on the socket
+				switch t := msg.(type) {
+				case *control.WordMsg:
+					stats.Checked <- t.Word
+					correction, found := corrections.CheckWord(t.Word)
+					if found {
+						t.Correction = correction
+						stats.Corrected <- [2]string{t.Word, t.Correction}
+						notifyCtrl <- notifications.Notification{
+							Title:   "Correction!",
+							Message: fmt.Sprintf("Corrected %s with %s", t.Word, t.Correction),
+						}
 					}
+					socket.SendWord(t)
+				default:
+					log.Debug().Msgf("Unknown message %T received: %v", msg, msg)
 				}
-				socket.SendWord(t)
-			default:
-				log.Debug().Msgf("Unknown message %T received: %v", msg, msg)
+			case <-socket.Done:
+				log.Debug().Msg("Received done, restarting socket...")
+				socket = control.CreateClient()
 			}
 		}
 	}
