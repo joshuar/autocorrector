@@ -6,6 +6,7 @@
 package cmd
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"syscall"
@@ -32,9 +33,16 @@ func setDebugging() {
 func setProfiling() {
 	if profileFlag {
 		go func() {
-			log.Debug().Err(http.ListenAndServe("localhost:6061", nil))
+			for i := 6060; i < 6070; i++ {
+				log.Debug().
+					Msgf("Starting profiler web interface on localhost:" + fmt.Sprint(i))
+				err := http.ListenAndServe("localhost:"+fmt.Sprint(i), nil)
+				if err != nil {
+					log.Debug().Err(err).
+						Msg("Trouble starting profiler, trying again.")
+				}
+			}
 		}()
-		log.Debug().Msg("Profiling is enabled and available at localhost:6061")
 	}
 }
 
