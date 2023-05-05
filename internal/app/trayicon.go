@@ -17,5 +17,25 @@ func (icon trayIcon) Name() string {
 }
 
 func (icon trayIcon) Content() []byte {
-	return defaultIcon
+	return defaultIconData
+}
+
+type disabledIcon struct{}
+
+func (icon disabledIcon) Name() string {
+	return "TrayIcon"
+}
+
+func (icon disabledIcon) Content() []byte {
+	return disabledIconData
+}
+
+type notifyingIcon struct{}
+
+func (icon notifyingIcon) Name() string {
+	return "TrayIcon"
+}
+
+func (icon notifyingIcon) Content() []byte {
+	return disabledIconData
 }
