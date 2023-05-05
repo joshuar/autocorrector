@@ -27,6 +27,7 @@ const (
 type App struct {
 	app           fyne.App
 	tray          fyne.Window
+	notifyHandler *notificationsHandler
 	Name, Version string
 }
 
@@ -40,7 +41,8 @@ func New() *App {
 
 func (a *App) Run() {
 	_, cancelfunc := context.WithCancel(context.Background())
-	go client.Start()
+	a.setupNotifications()
+	go client.Start(a.notifyHandler.data)
 	a.setupSystemTray()
 	a.app.Run()
 	cancelfunc()

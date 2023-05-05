@@ -45,7 +45,12 @@ func (a *App) setupSystemTray() {
 			))
 			w.Show()
 		})
-		menu := fyne.NewMenu(a.Name, menuItemAbout)
+		menuItemToggleNotifications := fyne.NewMenuItem("Toggle Notifications", func() {
+			a.notifyHandler.data <- !a.notifyHandler.showNotifications
+		})
+		menu := fyne.NewMenu(a.Name,
+			menuItemAbout,
+			menuItemToggleNotifications)
 		desk.SetSystemTrayMenu(menu)
 	}
 	a.tray.Hide()

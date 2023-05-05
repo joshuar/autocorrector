@@ -15,9 +15,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Start() {
+func Start(notifyCtrl chan interface{}) {
 	socket := control.CreateClient()
-	notifyCtrl := notifications.NewNotificationsHandler()
 	stats := wordstats.RunStats()
 	corrections := corrections.NewCorrections()
 
