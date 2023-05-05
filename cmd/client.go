@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"syscall"
 
@@ -55,13 +54,13 @@ var (
 					log.Panic().Err(err).Msgf("Unable to create configuration directory %s.", configDirectory)
 				}
 			}
-			defaultCorrections, err := ioutil.ReadFile("/usr/local/share/autocorrector/corrections.toml")
+			defaultCorrections, err := os.ReadFile("/usr/local/share/autocorrector/corrections.toml")
 			if err != nil {
 				log.Panic().Err(err).Msg("Unable to read default corrections file.")
 			}
 			defaultCorrectionsFile := xdg.ConfigHome + "/autocorrector/corrections.toml"
 			log.Info().Msgf("Copying default configuration file %s.", defaultCorrectionsFile)
-			err = ioutil.WriteFile(defaultCorrectionsFile, defaultCorrections, 0755)
+			err = os.WriteFile(defaultCorrectionsFile, defaultCorrections, 0755)
 			if err != nil {
 				log.Panic().Err(err).Msgf("Unable to write corrections file %s.", defaultCorrectionsFile)
 			}
