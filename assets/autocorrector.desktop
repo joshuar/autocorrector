@@ -1,8 +1,7 @@
 [Desktop Entry]
 Type=Application
-Encoding=UTF-8
 Name=Autocorrector
 Comment=Autocorrector corrects typos for you
 Exec=/usr/bin/autocorrector client
 Icon=/usr/local/share/pixmaps/autocorrector.png
-Terminal=False
+Terminal=false

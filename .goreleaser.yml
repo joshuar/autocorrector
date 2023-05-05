@@ -1,6 +1,9 @@
 before:
   hooks:
     - go mod tidy
+    - desktop-file-validate assets/autocorrector.desktop
+    # - fyne-cross linux -icon assets/icon/autocorrector.png -release -app-version {{.Version}}
+
 builds:
   - env:
       - CGO_ENABLED=1
@@ -12,20 +15,36 @@ builds:
 nfpms:
   - id: github.com/joshuar/autocorrector
     package_name: autocorrector
-    replacements:
-      amd64: 64-bit
-      linux: Linux
+    file_name_template: "{{ .ConventionalFileName }}"
     vendor: joshuar
     homepage: https://github.com/joshuar/autocorrector
     maintainer: Joshua Rich <joshua.rich@gmail.com>
-    description: Autocorrector is a tool similar to Autokey or AutoHotKey, but targeted mainly at word replacements.
+    description: |-
+      Autocorrector is a tool similar to Autokey or AutoHotKey, but targeted mainly at word replacements.
     license: Apache 2.0
     formats:
       - deb
       - rpm
-    dependencies:
-      - libappindicator-gtk3
-      - libevdev
+    bindir: /usr/bin
+    overrides:
+      rpm:
+        dependencies:
+          - libevdev
+          - libglvnd-glx
+          - libX11
+          - libXrandr
+          - libXxf86vm
+          - libXi
+          - libxcursor
+          - libXinerama
+      deb:
+        dependencies:
+          - libevdev2
+          - libgl1
+          - libxi6
+          - libxcursor1
+          - libxrandr2
+          - libxinerama1
     contents:
       - src: init/autocorrector@.service
         dst: /usr/lib/systemd/system/autocorrector@.service
@@ -41,23 +60,25 @@ nfpms:
         dst: /usr/local/share/pixmaps/autocorrector.png
       - src: assets/autocorrector.desktop
         dst: /usr/local/share/applications/autocorrector.desktop
+
 archives:
-  - replacements:
-      linux: Linux
-      amd64: x86_64
-    files:
-      - LICENSE
-      - README.md
-      - configs/corrections.toml
-      - init/autocorrector@.service
-      - assets/icon/autocorrector.png
+- format: binary
+
+# release:
+#   extra_files:
+#     - glob: fyne-cross/dist/linux-amd64/go-hass-agent.tar.xz
+
 checksum:
   name_template: 'checksums.txt'
+
 snapshot:
   name_template: "{{ .Tag }}-next"
+
 changelog:
+  use: github-native
   sort: asc
+  abbrev: 0
   filters:
     exclude:
       - '^docs:'
-      - '^test:'
+      - typo
