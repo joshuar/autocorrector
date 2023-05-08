@@ -50,17 +50,17 @@ nfpms:
       - src: init/autocorrector@.service
         dst: /usr/lib/systemd/system/autocorrector@.service
       - src: LICENSE
-        dst: /usr/local/share/autocorrector/LICENSE
+        dst: /usr/share/licenses/autocorrector/LICENSE
       - src: README.md
-        dst: /usr/local/share/autocorrector/README.md
+        dst: /usr/share/doc/autocorrector/README.md
       - src: USAGE.md
-        dst: /usr/local/share/autocorrector/USAGE.md
+        dst: /usr/share/doc/autocorrector/USAGE.md
       - src: configs/corrections.toml
-        dst: /usr/local/share/autocorrector/corrections.toml
+        dst: /usr/share/autocorrector/corrections.toml
       - src: assets/icon/autocorrector.png
-        dst: /usr/local/share/pixmaps/autocorrector.png
+        dst: /usr/share/pixmaps/autocorrector.png
       - src: assets/autocorrector.desktop
-        dst: /usr/local/share/applications/autocorrector.desktop
+        dst: /usr/share/applications/autocorrector.desktop
 
 archives:
 - format: binary

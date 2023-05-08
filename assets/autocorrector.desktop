@@ -1,7 +1,10 @@
 [Desktop Entry]
 Type=Application
+Version=1.0
 Name=Autocorrector
 Comment=Autocorrector corrects typos for you
-Exec=/usr/bin/autocorrector client
-Icon=/usr/local/share/pixmaps/autocorrector.png
+Path=/usr/bin
+Exec=autocorrector client
+Icon=autocorrector
 Terminal=false
+Categories=System;Monitor;TrayIcon;
