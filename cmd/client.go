@@ -13,6 +13,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	default_corrections_path = "/usr/share/autocorrector/corrections.toml"
+	default_desktop_file     = "/usr/share/applications/autocorrector.desktop"
+)
+
 var (
 	correctionsFlag string
 	logStatsFlag    bool
@@ -31,7 +36,7 @@ var (
 				viper.SetConfigName("corrections")
 				viper.SetConfigType("toml")
 				viper.AddConfigPath(xdg.ConfigHome + "/autocorrector")
-				viper.AddConfigPath("/usr/local/share/autocorrector")
+				viper.AddConfigPath("/usr/share/autocorrector")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
@@ -54,7 +59,7 @@ var (
 					log.Panic().Err(err).Msgf("Unable to create configuration directory %s.", configDirectory)
 				}
 			}
-			defaultCorrections, err := os.ReadFile("/usr/local/share/autocorrector/corrections.toml")
+			defaultCorrections, err := os.ReadFile(default_corrections_path)
 			if err != nil {
 				log.Panic().Err(err).Msg("Unable to read default corrections file.")
 			}
@@ -65,7 +70,7 @@ var (
 				log.Panic().Err(err).Msgf("Unable to write corrections file %s.", defaultCorrectionsFile)
 			}
 			log.Info().Msg("Creating autostart entry")
-			err = os.Symlink("/usr/local/share/applications/autocorrector.desktop", xdg.ConfigHome+"/autostart/autocorrector.desktop")
+			err = os.Symlink(default_desktop_file, xdg.ConfigHome+"/autostart/autocorrector.desktop")
 			if e, ok := err.(*os.LinkError); ok && e.Err == syscall.EEXIST {
 				log.Warn().Msg("Autostart entry already exists")
 			} else {
