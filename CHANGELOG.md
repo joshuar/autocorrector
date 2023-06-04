@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/joshuar/autocorrector/compare/v1.0.1...v1.1.0) (2023-06-04)
+
+
+### Features
+
+* **app:** rework icons for different app states ([f2da747](https://github.com/joshuar/autocorrector/commit/f2da747c3b7716213bed863a38291039db71a2cb))
+* **repo:** add bug report and feature request GitHub issue templates ([cb5a7c3](https://github.com/joshuar/autocorrector/commit/cb5a7c316631d1d9a0c719e4b2e11684a8509eda))
+
+
+### Bug Fixes
+
+* **assets:** .desktop file validation ([6c49dfe](https://github.com/joshuar/autocorrector/commit/6c49dfe3a7fcab80e0af76ff8d1e92202b352102))
+* **cmd:** change default paths for installation ([5d8b549](https://github.com/joshuar/autocorrector/commit/5d8b549635ef79a4bf6c07a0523e264076518b22))
+
 ## [1.0.1](https://github.com/joshuar/autocorrector/compare/v1.0.0...v1.0.1) (2023-05-05)
 
 
