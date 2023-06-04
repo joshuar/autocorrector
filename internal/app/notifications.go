@@ -7,8 +7,8 @@ import (
 )
 
 type notificationsHandler struct {
-	showNotifications bool
 	data              chan interface{}
+	showNotifications bool
 }
 
 // NewNotificationsHandler creates a new NotificationsHandler to
