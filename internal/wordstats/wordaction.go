@@ -8,10 +8,10 @@ import (
 )
 
 type wordAction struct {
+	Timestamp  time.Time
 	Word       string
 	Action     string
 	Correction string
-	Timestamp  time.Time
 }
 
 func encode(logEntry *wordAction) []byte {
