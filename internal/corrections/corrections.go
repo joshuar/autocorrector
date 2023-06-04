@@ -9,8 +9,8 @@ import (
 )
 
 type corrections struct {
-	mu              sync.Mutex
 	correctionsList map[string]string
+	mu              sync.Mutex
 }
 
 func (c *corrections) updateCorrections() {
@@ -41,7 +41,7 @@ func (c *corrections) CheckWord(word string) (string, bool) {
 func NewCorrections() *corrections {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Fatal().Msgf("Could not find config file: ", viper.ConfigFileUsed())
+			log.Fatal().Msgf("Could not find config file: %s", viper.ConfigFileUsed())
 		} else {
 			log.Fatal().Err(err).Msg("Fatal error config file.")
 		}
