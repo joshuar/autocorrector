@@ -39,17 +39,17 @@ type Msg struct {
 }
 
 type Packet struct {
-	EncryptedSize int
 	EncryptedData []byte
+	EncryptedSize int
 }
 
 type Socket struct {
+	Conn      net.Conn
 	addr      *net.UnixAddr
 	Listener  *net.UnixListener
-	sharedKey [32]byte
-	Conn      net.Conn
 	Data      chan interface{}
 	Done      chan bool
+	sharedKey [32]byte
 }
 
 // CreateServer is used by the server command to create a new socket for communication between server and client
@@ -127,7 +127,7 @@ func listenOnSocket(addr *net.UnixAddr, username string) *net.UnixListener {
 	gid, _ := strconv.Atoi(u.Gid)
 	if err := os.Chown(SocketPath, uid, gid); err != nil {
 		log.Debug().Caller().Err(err).
-			Msgf("Unable to change ownership on socket file %s to %s:%s : %s", SocketPath, 0, gid, err)
+			Msgf("Unable to change ownership on socket file %s to %d:%d : %s", SocketPath, 0, gid, err)
 	}
 	return listener
 }
