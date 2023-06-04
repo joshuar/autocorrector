@@ -69,7 +69,7 @@ func (kt *KeyTracker) slurpWords() {
 				_, err := charBuf.WriteRune(k.AsRune)
 				if err != nil {
 					log.Debug().Caller().Err(err).
-						Msgf("Failed to write %s to character buffer.", k.AsRune)
+						Msgf("Failed to write %v to character buffer.", k.AsRune)
 				}
 			}
 		}
