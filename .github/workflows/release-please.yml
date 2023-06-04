@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         if: ${{ steps.release_please.outputs.release_created }}
         id: install_linux_deps
-        run: sudo apt-get install -y libevdev
+        run: sudo apt-get install -y libevdev-dev
       - name: Update VERSION
         if: ${{ steps.release_please.outputs.release_created }}
         id: update_version
