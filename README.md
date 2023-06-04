@@ -1,3 +1,4 @@
+# Autocorrector
 
 ![Apache 2.0](https://img.shields.io/github/license/joshuar/autocorrector) 
 ![GitHub last commit](https://img.shields.io/github/last-commit/joshuar/autocorrector)
@@ -5,14 +6,11 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/joshuar/autocorrector.svg)](https://pkg.go.dev/github.com/joshuar/autocorrector)
 [![Release](https://img.shields.io/github/release/joshuar/autocorrector.svg?style=flat-square)](https://github.com/joshuar/autocorrector/releases/latest)
 
-# Autocorrector
-
 ## ❓ What is it?
 
 Autocorrector is a tool similar to Autokey or AutoHotKey, but targeted mainly at word replacements.  I wrote it because all I wanted to do was fix my fat-finger typos automatically.  That is what autocorrector aims to do.  
 
 Autocorrector reads a TOML configuration file of key-values; the key being the typo and the value being the replacement.  When it detects you have entered a typo, it helpfully corrects it.
-
 
 ## ⬇️ Installation
 
