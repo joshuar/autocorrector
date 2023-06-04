@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/joshuar/autocorrector/compare/v1.1.1...v1.1.2) (2023-06-04)
+
+
+### Bug Fixes
+
+* **assets:** incorrect OnlyShowIn value removed ([0b5d6f4](https://github.com/joshuar/autocorrector/commit/0b5d6f4ac9a3e4b6dfa36d6978112c10f2bf3fe5))
+
 ## [1.1.1](https://github.com/joshuar/autocorrector/compare/v0.4.9...v1.1.1) (2023-06-04)
 
 
