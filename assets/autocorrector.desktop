@@ -8,3 +8,4 @@ Exec=autocorrector client
 Icon=autocorrector
 Terminal=false
 Categories=System;Monitor;TrayIcon;
+OnlyShowIn=GNOME;Xfce;KDE;
