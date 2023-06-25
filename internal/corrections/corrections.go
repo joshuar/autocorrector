@@ -3,17 +3,18 @@ package corrections
 import (
 	"sync"
 
+	"github.com/adrg/xdg"
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
-type corrections struct {
+type Corrections struct {
 	correctionsList map[string]string
 	mu              sync.Mutex
 }
 
-func (c *corrections) updateCorrections() {
+func (c *Corrections) updateCorrections() {
 	c.mu.Lock()
 	viper.Unmarshal(&c.correctionsList)
 	// check if any value is also a key
@@ -28,7 +29,7 @@ func (c *corrections) updateCorrections() {
 	c.mu.Unlock()
 }
 
-func (c *corrections) CheckWord(word string) (string, bool) {
+func (c *Corrections) CheckWord(word string) (string, bool) {
 	c.mu.Lock()
 	correction, ok := c.correctionsList[word]
 	c.mu.Unlock()
@@ -38,7 +39,12 @@ func (c *corrections) CheckWord(word string) (string, bool) {
 // NewCorrections creates channels for sending words to check for corrections
 // (and signalling a config file reload) as well as a channel for recieving
 // corrected words
-func NewCorrections() *corrections {
+func NewCorrections() *Corrections {
+	viper.SetConfigName("corrections")
+	viper.SetConfigType("toml")
+	viper.AddConfigPath(xdg.ConfigHome + "/autocorrector")
+	viper.AddConfigPath("/usr/share/autocorrector")
+
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Fatal().Msgf("Could not find config file: %s", viper.ConfigFileUsed())
@@ -48,7 +54,7 @@ func NewCorrections() *corrections {
 	}
 	log.Debug().Caller().
 		Msgf("Using corrections config at %s", viper.ConfigFileUsed())
-	corrections := &corrections{
+	corrections := &Corrections{
 		correctionsList: make(map[string]string),
 	}
 	viper.OnConfigChange(func(e fsnotify.Event) {

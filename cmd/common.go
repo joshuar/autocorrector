@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"syscall"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -43,15 +42,5 @@ func setProfiling() {
 				}
 			}
 		}()
-	}
-}
-
-func ensureEUID() {
-	euid := syscall.Geteuid()
-	uid := syscall.Getuid()
-	egid := syscall.Getegid()
-	// gid := syscall.Getgid()
-	if euid != 0 || egid != 0 || uid != 0 {
-		log.Fatal().Msg("autocorrector server must be run as root.")
 	}
 }

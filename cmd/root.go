@@ -20,7 +20,6 @@ var (
 		Long:  `Autocorrector is a tool similar to the word replacement functionality in Autokey or AutoHotKey.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			setLogging()
-			ensureEUID()
 			setDebugging()
 			setProfiling()
 		},
@@ -34,7 +33,6 @@ var (
 		Long:  "Copies and enables an autocorrector systemd service for the specified user",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			ensureEUID()
 			systemdReload := exec.Command("systemctl", "daemon-reload")
 			err := systemdReload.Run()
 			if err != nil {
