@@ -3,7 +3,6 @@ package cmd
 import (
 	_ "net/http/pprof"
 	"os"
-	"os/exec"
 
 	"github.com/joshuar/autocorrector/internal/server"
 	"github.com/rs/zerolog/log"
@@ -27,24 +26,6 @@ var (
 			server.Run(userFlag)
 		},
 	}
-	enableCmd = &cobra.Command{
-		Use:   "enable [username]",
-		Short: "Enable the autocorrector service for the specified user",
-		Long:  "Copies and enables an autocorrector systemd service for the specified user",
-		Args:  cobra.MinimumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			systemdReload := exec.Command("systemctl", "daemon-reload")
-			err := systemdReload.Run()
-			if err != nil {
-				log.Warn().Err(err).Msgf("Try manually running the following command and fix any errors it returns: %s", systemdReload.String())
-			}
-			systemdEnable := exec.Command("systemctl", "enable", "autocorrector@"+args[0])
-			err = systemdEnable.Run()
-			if err != nil {
-				log.Warn().Err(err).Msgf("Try manually running the following command and fix any errors it returns: %s", systemdEnable.String())
-			}
-		},
-	}
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -58,9 +39,6 @@ func Execute() {
 
 // init defines flags and configuration settings
 func init() {
-	rootCmd.Flags().StringVar(&userFlag, "user", "", "user to allow access to control socket")
-	rootCmd.MarkFlagRequired("user")
 	rootCmd.Flags().BoolVarP(&debugFlag, "debug", "d", false, "debug output")
 	rootCmd.Flags().BoolVarP(&profileFlag, "profile", "", false, "enable profiling")
-	rootCmd.AddCommand(enableCmd)
 }
