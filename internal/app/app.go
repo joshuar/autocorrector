@@ -26,6 +26,8 @@ var Version string
 var debugAppID = ""
 
 var keyTracker *keytracker.KeyTracker
+var stats *wordstats.WordStats
+var correctionsList *corrections.Corrections
 
 const (
 	Name      = "autocorrector"
@@ -51,9 +53,9 @@ func New() *App {
 func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
 	handler := handler.NewHandler()
+	correctionsList = corrections.NewCorrections()
 	keyTracker = keytracker.NewKeyTracker(handler.WordCh)
-	corrections := corrections.NewCorrections()
-	stats := wordstats.RunStats()
+	stats = wordstats.RunStats()
 
 	go func() {
 		for {
@@ -72,7 +74,7 @@ func (a *App) Run() {
 		for newWord := range handler.WordCh {
 			log.Debug().Msgf("Checking word: %s", newWord.Word)
 			stats.Checked <- newWord.Word
-			if correction, ok := corrections.CheckWord(newWord.Word); ok {
+			if correction, ok := correctionsList.CheckWord(newWord.Word); ok {
 				handler.CorrectionCh <- word.WordDetails{
 					Word:       newWord.Word,
 					Correction: correction,
