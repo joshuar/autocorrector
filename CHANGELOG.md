@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.0.0](https://github.com/joshuar/autocorrector/compare/v1.1.2...v2.0.0) (2023-06-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* working code without sockets
+
+### Features
+
+* **app,keytracker:** split out channel handling and word details from keytracker ([998e156](https://github.com/joshuar/autocorrector/commit/998e156a8efbc3f4fc4134df227556a80b862293))
+* **app:** add settings, report issue, request feature tray menu options ([74377bc](https://github.com/joshuar/autocorrector/commit/74377bcd34e2e6fd846784c9cae05eda41d4cb86))
+* working code without sockets ([80b2028](https://github.com/joshuar/autocorrector/commit/80b2028c49b937a1e7d55157f50b992e553f9937))
+
+
+### Bug Fixes
+
+* **app,keytracker:** corrections can now be toggle on/off again ([c560ad8](https://github.com/joshuar/autocorrector/commit/c560ad8ab996d0a5e125a474f1da542becce91bc))
+* **app:** "Show Stats" tray icon menu option restored ([878e12b](https://github.com/joshuar/autocorrector/commit/878e12b6505d35d6470f919369db9071d59bed44))
+* **app:** notifications toggle and display working again ([03e00f5](https://github.com/joshuar/autocorrector/commit/03e00f5d2773f22bc4e9fb27aa8fbaa3a31f14c6))
+* **app:** remove unused notifications code ([3c01d3b](https://github.com/joshuar/autocorrector/commit/3c01d3bd0ee410eecdde36acb85f3f981ce17dfa))
+* **app:** stats tracking now working again ([8486b27](https://github.com/joshuar/autocorrector/commit/8486b27c0ae2b14dd3dce0e67cb16d49c88b01cd))
+* **cmd,app,server:** merge client command into root command ([aa260aa](https://github.com/joshuar/autocorrector/commit/aa260aa1d577a0126157677931b1cef6c49166f8))
+* **cmd:** remove `--user` command option and `enable` sub-command ([35f0dee](https://github.com/joshuar/autocorrector/commit/35f0dee26964a49f5a223a4832e3723dcdf94091))
+* **notifications:** remove more unused notifications code ([c582389](https://github.com/joshuar/autocorrector/commit/c58238908c5524190782ed053130315ab47e61cd))
+* remove no longer used client and control code ([3105d1f](https://github.com/joshuar/autocorrector/commit/3105d1f9dd85e3609e17c6fc9334e383d7c13081))
+
 ## [1.1.2](https://github.com/joshuar/autocorrector/compare/v1.1.1...v1.1.2) (2023-06-04)
 
 
