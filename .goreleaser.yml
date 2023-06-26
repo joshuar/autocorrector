@@ -13,6 +13,22 @@ builds:
     goarch:
       - amd64
 
+archives:
+- format: binary
+
+# release:
+#   extra_files:
+#     - glob: fyne-cross/dist/linux-amd64/go-hass-agent.tar.xz
+
+changelog:
+  use: github-native
+  sort: asc
+  abbrev: 0
+  filters:
+    exclude:
+      - '^docs:'
+      - typo
+
 nfpms:
   - id: github.com/joshuar/autocorrector
     package_name: autocorrector
@@ -38,6 +54,7 @@ nfpms:
           - libXi
           - libXcursor
           - libXinerama
+          - libcap
       deb:
         dependencies:
           - libevdev2
@@ -46,9 +63,8 @@ nfpms:
           - libxcursor1
           - libxrandr2
           - libxinerama1
+          - libcap2
     contents:
-      - src: init/autocorrector@.service
-        dst: /usr/lib/systemd/system/autocorrector@.service
       - src: LICENSE
         dst: /usr/share/licenses/autocorrector/LICENSE
       - src: README.md
@@ -62,24 +78,7 @@ nfpms:
       - src: assets/autocorrector.desktop
         dst: /usr/share/applications/autocorrector.desktop
 
-archives:
-- format: binary
+    scripts:
+      postinstall: tools/postInstall
 
-# release:
-#   extra_files:
-#     - glob: fyne-cross/dist/linux-amd64/go-hass-agent.tar.xz
-
-checksum:
-  name_template: 'checksums.txt'
-
-snapshot:
-  name_template: "{{ .Tag }}-next"
-
-changelog:
-  use: github-native
-  sort: asc
-  abbrev: 0
-  filters:
-    exclude:
-      - '^docs:'
-      - typo
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json

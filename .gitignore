@@ -14,7 +14,7 @@
 !assets/
 !docs/**/*.md
 !docs/**/*.png
-!tools/
+!tools/*
 # ...even if they are in subdirectories
 !*/
 
