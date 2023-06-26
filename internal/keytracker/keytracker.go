@@ -21,22 +21,7 @@ import (
 type KeyTracker struct {
 	kbd       *kbd.VirtualKeyboardDevice
 	kbdEvents <-chan kbd.KeyEvent
-	ControlCh chan interface{}
 	paused    bool
-}
-
-func (kt *KeyTracker) controller() {
-	for d := range kt.ControlCh {
-		switch d := d.(type) {
-		case bool:
-			log.Debug().Caller().
-				Msgf("Keytracker is paused? %v", d)
-			kt.paused = d
-		default:
-			log.Debug().Caller().
-				Msgf("Unexpected data %T on notification channel: %v", d, d)
-		}
-	}
 }
 
 func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails) {
@@ -44,6 +29,9 @@ func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails) {
 	patternBuf := newPatternBuf(3)
 	log.Debug().Msg("Slurping words...")
 	for k := range kt.kbdEvents {
+		if kt.paused {
+			continue
+		}
 		if k.IsKeyRelease() {
 			patternBuf.write(k.AsRune)
 			if patternBuf.match(".  ") {
@@ -84,8 +72,23 @@ func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails) {
 	kt.CloseKeyTracker()
 }
 
-func (kt *KeyTracker) Paused() bool {
-	return kt.paused
+func (kt *KeyTracker) CorrectWord(correction word.WordDetails) {
+	if !kt.paused {
+		log.Debug().Msgf("Making correction %s to %s", correction.Word, correction.Correction)
+
+		// Erase the existing word.
+		// Effectively, hit backspace key for the length of the word plus the punctuation mark.
+		for i := 0; i <= utf8.RuneCountInString(correction.Word); i++ {
+			kt.kbd.TypeBackspace()
+		}
+		// Insert the replacement.
+		// Type out the replacement and whatever punctuation/delimiter was after it.
+		kt.kbd.TypeString(correction.Correction + string(correction.Punct))
+	}
+}
+
+func (kt *KeyTracker) Toggle() {
+	kt.paused = !kt.paused
 }
 
 // CloseKeyTracker shuts down the channels used for key tracking
@@ -103,25 +106,8 @@ func NewKeyTracker(wordCh chan word.WordDetails) *KeyTracker {
 	kt := &KeyTracker{
 		kbd:       vKbd,
 		kbdEvents: kbd.SnoopAllKeyboards(kbd.OpenAllKeyboardDevices()),
-		ControlCh: make(chan interface{}),
 		paused:    false,
 	}
-	go kt.controller()
 	go kt.slurpWords(wordCh)
 	return kt
-}
-
-func (kt *KeyTracker) CorrectWord(correction word.WordDetails) {
-	if !kt.paused {
-		log.Debug().Msgf("Making correction %s to %s", correction.Word, correction.Correction)
-
-		// Erase the existing word.
-		// Effectively, hit backspace key for the length of the word plus the punctuation mark.
-		for i := 0; i <= utf8.RuneCountInString(correction.Word); i++ {
-			kt.kbd.TypeBackspace()
-		}
-		// Insert the replacement.
-		// Type out the replacement and whatever punctuation/delimiter was after it.
-		kt.kbd.TypeString(correction.Correction + string(correction.Punct))
-	}
 }

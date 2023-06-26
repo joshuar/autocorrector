@@ -24,6 +24,8 @@ var Version string
 
 var debugAppID = ""
 
+var keyTracker *keytracker.KeyTracker
+
 const (
 	Name      = "autocorrector"
 	fyneAppID = "com.github.joshuar.autocorrector"
@@ -48,7 +50,7 @@ func New() *App {
 func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
 	handler := handler.NewHandler()
-	keyTracker := keytracker.NewKeyTracker(handler.WordCh)
+	keyTracker = keytracker.NewKeyTracker(handler.WordCh)
 	corrections := corrections.NewCorrections()
 
 	go func() {
@@ -79,7 +81,6 @@ func (a *App) Run() {
 
 	go func() {
 		for correction := range handler.CorrectionCh {
-
 			keyTracker.CorrectWord(correction)
 			handler.NotificationsCh <- fyne.Notification{
 				Title:   "Correction!",
