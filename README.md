@@ -1,6 +1,6 @@
 # Autocorrector
 
-![Apache 2.0](https://img.shields.io/github/license/joshuar/autocorrector) 
+![MIT](https://img.shields.io/github/license/joshuar/autocorrector) 
 ![GitHub last commit](https://img.shields.io/github/last-commit/joshuar/autocorrector)
 [![Go Report Card](https://goreportcard.com/badge/github.com/joshuar/autocorrector?style=flat-square)](https://goreportcard.com/report/github.com/joshuar/autocorrector) 
 [![Go Reference](https://pkg.go.dev/badge/github.com/joshuar/autocorrector.svg)](https://pkg.go.dev/github.com/joshuar/autocorrector)
@@ -53,4 +53,4 @@ Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-error
 
 ## License
 
-[Apache 2.0](LICENSE)
+[MIT](LICENSE)
