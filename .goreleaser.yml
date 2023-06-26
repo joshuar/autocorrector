@@ -22,7 +22,7 @@ nfpms:
     maintainer: Joshua Rich <joshua.rich@gmail.com>
     description: |-
       Autocorrector is a tool similar to Autokey or AutoHotKey, but targeted mainly at word replacements.
-    license: Apache 2.0
+    license: MIT
     formats:
       - deb
       - rpm
