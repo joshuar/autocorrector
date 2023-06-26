@@ -25,25 +25,26 @@ const (
 )
 
 type App struct {
-	app           fyne.App
-	tray          fyne.Window
-	notifyHandler *notificationsHandler
-	Name, Version string
+	app               fyne.App
+	tray              fyne.Window
+	Name, Version     string
+	showNotifications bool
 }
 
 func New() *App {
 	return &App{
-		app:     newUI(),
-		Name:    Name,
-		Version: Version,
+		app:               newUI(),
+		Name:              Name,
+		Version:           Version,
+		showNotifications: false,
 	}
 }
 
 func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
-	a.setupNotifications()
+	notificationsCh := a.notificationHandler()
 	a.setupSystemTray()
-	go server.Run(appCtx)
+	go server.Run(appCtx, notificationsCh)
 	a.app.Run()
 	cancelfunc()
 }

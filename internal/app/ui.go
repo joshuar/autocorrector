@@ -46,7 +46,7 @@ func (a *App) setupSystemTray() {
 			w.Show()
 		})
 		menuItemToggleNotifications := fyne.NewMenuItem("Toggle Notifications", func() {
-			a.notifyHandler.data <- !a.notifyHandler.showNotifications
+			a.showNotifications = !a.showNotifications
 		})
 		menu := fyne.NewMenu(a.Name,
 			menuItemAbout,

@@ -3,9 +3,11 @@ package keytracker
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"unicode"
 	"unicode/utf8"
 
+	"fyne.io/fyne/v2"
 	"github.com/joshuar/autocorrector/internal/corrections"
 	kbd "github.com/joshuar/gokbd"
 	"github.com/rs/zerolog/log"
@@ -96,7 +98,7 @@ func (kt *KeyTracker) checkWords() {
 	}
 }
 
-func (kt *KeyTracker) correctWords() {
+func (kt *KeyTracker) correctWords(notificationsCh chan fyne.Notification) {
 	for c := range kt.CorrectionCh {
 		if !kt.paused {
 			log.Debug().Msgf("Making correction %s to %s", c.Word, c.Correction)
@@ -108,6 +110,10 @@ func (kt *KeyTracker) correctWords() {
 			// Insert the replacement.
 			// Type out the replacement and whatever punctuation/delimiter was after it.
 			kt.kbd.TypeString(c.Correction + string(c.Punct))
+			notificationsCh <- fyne.Notification{
+				Title:   "Correction!",
+				Content: fmt.Sprintf("Corrected %s with %s", c.Word, c.Correction),
+			}
 		}
 	}
 }
@@ -122,7 +128,7 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(ctx context.Context) *KeyTracker {
+func NewKeyTracker(ctx context.Context, notificationsCh chan fyne.Notification) *KeyTracker {
 	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
 	if err != nil {
 		log.Error().Err(err).Msg("Could not open a new virtual keyboard.")
@@ -140,6 +146,6 @@ func NewKeyTracker(ctx context.Context) *KeyTracker {
 	go kt.controller()
 	go kt.slurpWords()
 	go kt.checkWords()
-	go kt.correctWords()
+	go kt.correctWords(notificationsCh)
 	return kt
 }
