@@ -10,7 +10,7 @@ import (
 	_ "embed"
 
 	"fyne.io/fyne/v2"
-	"github.com/joshuar/autocorrector/internal/server"
+	"github.com/joshuar/autocorrector/internal/keytracker"
 )
 
 //go:generate sh -c "printf %s $(git tag | tail -1) > VERSION"
@@ -44,7 +44,7 @@ func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
 	notificationsCh := a.notificationHandler()
 	a.setupSystemTray()
-	go server.Run(appCtx, notificationsCh)
+	keytracker.NewKeyTracker(appCtx, notificationsCh)
 	a.app.Run()
 	cancelfunc()
 }
