@@ -2,13 +2,10 @@ package keytracker
 
 import (
 	"bytes"
-	"context"
-	"fmt"
 	"unicode"
 	"unicode/utf8"
 
-	"fyne.io/fyne/v2"
-	"github.com/joshuar/autocorrector/internal/corrections"
+	"github.com/joshuar/autocorrector/internal/word"
 	kbd "github.com/joshuar/gokbd"
 	"github.com/rs/zerolog/log"
 )
@@ -17,13 +14,10 @@ import (
 // indicating when word/line delimiter characters are encountered or
 // backspace is pressed
 type KeyTracker struct {
-	kbd          *kbd.VirtualKeyboardDevice
-	kbdEvents    <-chan kbd.KeyEvent
-	ControlCh    chan interface{}
-	WordCh       chan WordDetails
-	CorrectionCh chan WordDetails
-	corrections  *corrections.Corrections
-	paused       bool
+	kbd       *kbd.VirtualKeyboardDevice
+	kbdEvents <-chan kbd.KeyEvent
+	ControlCh chan interface{}
+	paused    bool
 }
 
 func (kt *KeyTracker) controller() {
@@ -40,7 +34,7 @@ func (kt *KeyTracker) controller() {
 	}
 }
 
-func (kt *KeyTracker) slurpWords() {
+func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails) {
 	charBuf := new(bytes.Buffer)
 	patternBuf := newPatternBuf(3)
 	log.Debug().Msg("Slurping words...")
@@ -65,7 +59,7 @@ func (kt *KeyTracker) slurpWords() {
 				// most other punctuation should indicate end of word, so
 				// handle that
 				if charBuf.Len() > 0 {
-					kt.WordCh <- WordDetails{
+					wordCh <- word.WordDetails{
 						Word:  charBuf.String(),
 						Punct: k.AsRune,
 					}
@@ -85,39 +79,6 @@ func (kt *KeyTracker) slurpWords() {
 	kt.CloseKeyTracker()
 }
 
-func (kt *KeyTracker) checkWords() {
-	for w := range kt.WordCh {
-		log.Debug().Msgf("Checking word: %s", w.Word)
-		if correction, ok := kt.corrections.CheckWord(w.Word); ok {
-			kt.CorrectionCh <- WordDetails{
-				Word:       w.Word,
-				Correction: correction,
-				Punct:      w.Punct,
-			}
-		}
-	}
-}
-
-func (kt *KeyTracker) correctWords(notificationsCh chan fyne.Notification) {
-	for c := range kt.CorrectionCh {
-		if !kt.paused {
-			log.Debug().Msgf("Making correction %s to %s", c.Word, c.Correction)
-			// Erase the existing word.
-			// Effectively, hit backspace key for the length of the word plus the punctuation mark.
-			for i := 0; i <= utf8.RuneCountInString(c.Word); i++ {
-				kt.kbd.TypeBackspace()
-			}
-			// Insert the replacement.
-			// Type out the replacement and whatever punctuation/delimiter was after it.
-			kt.kbd.TypeString(c.Correction + string(c.Punct))
-			notificationsCh <- fyne.Notification{
-				Title:   "Correction!",
-				Content: fmt.Sprintf("Corrected %s with %s", c.Word, c.Correction),
-			}
-		}
-	}
-}
-
 func (kt *KeyTracker) Paused() bool {
 	return kt.paused
 }
@@ -128,24 +89,34 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(ctx context.Context, notificationsCh chan fyne.Notification) *KeyTracker {
+func NewKeyTracker(wordCh chan word.WordDetails) *KeyTracker {
 	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
 	if err != nil {
 		log.Error().Err(err).Msg("Could not open a new virtual keyboard.")
 		return nil
 	}
 	kt := &KeyTracker{
-		kbd:          vKbd,
-		kbdEvents:    kbd.SnoopAllKeyboards(kbd.OpenAllKeyboardDevices()),
-		ControlCh:    make(chan interface{}),
-		WordCh:       make(chan WordDetails),
-		CorrectionCh: make(chan WordDetails),
-		paused:       false,
-		corrections:  corrections.NewCorrections(),
+		kbd:       vKbd,
+		kbdEvents: kbd.SnoopAllKeyboards(kbd.OpenAllKeyboardDevices()),
+		ControlCh: make(chan interface{}),
+		paused:    false,
 	}
 	go kt.controller()
-	go kt.slurpWords()
-	go kt.checkWords()
-	go kt.correctWords(notificationsCh)
+	go kt.slurpWords(wordCh)
 	return kt
+}
+
+func (kt *KeyTracker) CorrectWord(correction word.WordDetails) {
+	if !kt.paused {
+		log.Debug().Msgf("Making correction %s to %s", correction.Word, correction.Correction)
+
+		// Erase the existing word.
+		// Effectively, hit backspace key for the length of the word plus the punctuation mark.
+		for i := 0; i <= utf8.RuneCountInString(correction.Word); i++ {
+			kt.kbd.TypeBackspace()
+		}
+		// Insert the replacement.
+		// Type out the replacement and whatever punctuation/delimiter was after it.
+		kt.kbd.TypeString(correction.Correction + string(correction.Punct))
+	}
 }

@@ -8,9 +8,14 @@ package app
 import (
 	"context"
 	_ "embed"
+	"fmt"
 
 	"fyne.io/fyne/v2"
+	"github.com/joshuar/autocorrector/internal/corrections"
+	"github.com/joshuar/autocorrector/internal/handler"
 	"github.com/joshuar/autocorrector/internal/keytracker"
+	"github.com/joshuar/autocorrector/internal/word"
+	"github.com/rs/zerolog/log"
 )
 
 //go:generate sh -c "printf %s $(git tag | tail -1) > VERSION"
@@ -42,9 +47,50 @@ func New() *App {
 
 func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
-	notificationsCh := a.notificationHandler()
+	handler := handler.NewHandler()
+	keyTracker := keytracker.NewKeyTracker(handler.WordCh)
+	corrections := corrections.NewCorrections()
+
+	go func() {
+		for {
+			select {
+			case <-appCtx.Done():
+				return
+			case notification := <-handler.NotificationsCh:
+				if a.showNotifications {
+					a.app.SendNotification(&notification)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		for newWord := range handler.WordCh {
+			log.Debug().Msgf("Checking word: %s", newWord.Word)
+			if correction, ok := corrections.CheckWord(newWord.Word); ok {
+				handler.CorrectionCh <- word.WordDetails{
+					Word:       newWord.Word,
+					Correction: correction,
+					Punct:      newWord.Punct,
+				}
+			}
+		}
+	}()
+
+	go func() {
+		for correction := range handler.CorrectionCh {
+
+			keyTracker.CorrectWord(correction)
+			handler.NotificationsCh <- fyne.Notification{
+				Title:   "Correction!",
+				Content: fmt.Sprintf("Corrected %s with %s", correction.Word, correction.Correction),
+			}
+		}
+	}()
+
 	a.setupSystemTray()
-	keytracker.NewKeyTracker(appCtx, notificationsCh)
+	// stats := wordstats.RunStats()
+
 	a.app.Run()
 	cancelfunc()
 }
