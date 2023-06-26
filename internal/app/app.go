@@ -15,6 +15,7 @@ import (
 	"github.com/joshuar/autocorrector/internal/handler"
 	"github.com/joshuar/autocorrector/internal/keytracker"
 	"github.com/joshuar/autocorrector/internal/word"
+	"github.com/joshuar/autocorrector/internal/wordstats"
 	"github.com/rs/zerolog/log"
 )
 
@@ -52,6 +53,7 @@ func (a *App) Run() {
 	handler := handler.NewHandler()
 	keyTracker = keytracker.NewKeyTracker(handler.WordCh)
 	corrections := corrections.NewCorrections()
+	stats := wordstats.RunStats()
 
 	go func() {
 		for {
@@ -69,6 +71,7 @@ func (a *App) Run() {
 	go func() {
 		for newWord := range handler.WordCh {
 			log.Debug().Msgf("Checking word: %s", newWord.Word)
+			stats.Checked <- newWord.Word
 			if correction, ok := corrections.CheckWord(newWord.Word); ok {
 				handler.CorrectionCh <- word.WordDetails{
 					Word:       newWord.Word,
@@ -82,6 +85,7 @@ func (a *App) Run() {
 	go func() {
 		for correction := range handler.CorrectionCh {
 			keyTracker.CorrectWord(correction)
+			stats.Corrected <- [2]string{correction.Word, correction.Correction}
 			handler.NotificationsCh <- fyne.Notification{
 				Title:   "Correction!",
 				Content: fmt.Sprintf("Corrected %s with %s", correction.Word, correction.Correction),
@@ -90,8 +94,6 @@ func (a *App) Run() {
 	}()
 
 	a.setupSystemTray()
-	// stats := wordstats.RunStats()
-
 	a.app.Run()
 	cancelfunc()
 }
