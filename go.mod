@@ -5,11 +5,10 @@ go 1.20
 require (
 	github.com/adrg/xdg v0.4.0
 	github.com/fsnotify/fsnotify v1.6.0
-	github.com/joshuar/gokbd v0.2.0
+	github.com/joshuar/gokbd v0.2.1
 	github.com/nutsdb/nutsdb v0.12.3
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
-	golang.org/x/crypto v0.10.0
 )
 
 require (
@@ -23,14 +22,22 @@ require (
 	github.com/go-text/typesetting v0.0.0-20230618175549-b5753034b590 // indirect
 	github.com/goki/freetype v1.0.1 // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
-	github.com/klauspost/compress v1.16.6 // indirect
+	github.com/neelance/astrewrite v0.0.0-20160511093645-99348263ae86 // indirect
+	github.com/neelance/sourcemap v0.0.0-20200213170602-2833bce08e4c // indirect
+	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
 	github.com/yuin/goldmark v1.5.4 // indirect
+	golang.org/x/crypto v0.10.0 // indirect
 	golang.org/x/image v0.8.0 // indirect
 	golang.org/x/mobile v0.0.0-20230531173138-3c911d8e3eda // indirect
 	golang.org/x/net v0.11.0 // indirect
+	golang.org/x/sync v0.1.0 // indirect
+	golang.org/x/term v0.9.0 // indirect
+	golang.org/x/tools v0.6.0 // indirect
 	honnef.co/go/js/dom v0.0.0-20221001195520-26252dedbe70 // indirect
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.69 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.69 // indirect
@@ -39,13 +46,11 @@ require (
 require (
 	fyne.io/fyne/v2 v2.3.5
 	github.com/bwmarrin/snowflake v0.3.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/lxzan/gws v1.6.0
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
