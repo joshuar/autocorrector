@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         if: ${{ steps.release_please.outputs.release_created }}
         id: install_linux_deps
-        run: sudo apt-get install -y libevdev-dev desktop-file-utils
+        run: sudo apt-get install -y libevdev-dev desktop-file-utils gcc libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
       - name: Update VERSION
         if: ${{ steps.release_please.outputs.release_created }}
         id: update_version
