@@ -18,10 +18,7 @@ Autocorrector reads a TOML configuration file of key-values; the key being the t
 > **This program will only run on Linux**
 
 1. Download either the `.rpm` or `.deb` file and install using your package manager.
-2. Set up the client: `autocorrector client setup`
-3. Set up the server: `sudo autocorrector enable $USERNAME` (substitute `$USERNAME` for your username)
-4. Start the service with `systemctl start autocorrector@USERNAME`.
-5. Run `autocorrector client` or use the **autocorrector** menu entry in your desktop environment.
+2. Run `autocorrector` or use the **autocorrector** menu entry in your desktop environment.
 
 ## 📝 Configuration and additional details
 
@@ -47,7 +44,7 @@ Check out more awesome Go things at the [Awesome Go List](https://github.com/ave
 
 The default list of replacements is sourced from the following AutoHotKey script containing common English typos and misspellings:
 
-- https://www.autohotkey.com/download/AutoCorrect.ahk
+- <https://www.autohotkey.com/download/AutoCorrect.ahk>
 
 Icon taken from [here](https://pixabay.com/vectors/spellcheck-correct-typo-errors-1292780/).
 
