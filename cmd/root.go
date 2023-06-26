@@ -4,7 +4,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"github.com/joshuar/autocorrector/internal/server"
+	"github.com/joshuar/autocorrector/internal/app"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +23,8 @@ var (
 			setProfiling()
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			server.Run(userFlag)
+			app := app.New()
+			app.Run()
 		},
 	}
 )

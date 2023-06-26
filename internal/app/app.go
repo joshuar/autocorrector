@@ -10,7 +10,7 @@ import (
 	_ "embed"
 
 	"fyne.io/fyne/v2"
-	"github.com/joshuar/autocorrector/internal/client"
+	"github.com/joshuar/autocorrector/internal/server"
 )
 
 //go:generate sh -c "printf %s $(git tag | tail -1) > VERSION"
@@ -40,10 +40,10 @@ func New() *App {
 }
 
 func (a *App) Run() {
-	_, cancelfunc := context.WithCancel(context.Background())
+	appCtx, cancelfunc := context.WithCancel(context.Background())
 	a.setupNotifications()
-	go client.Start(a.notifyHandler.data)
 	a.setupSystemTray()
+	go server.Run(appCtx)
 	a.app.Run()
 	cancelfunc()
 }
