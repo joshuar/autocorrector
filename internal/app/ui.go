@@ -38,11 +38,6 @@ func newUI() fyne.App {
 }
 
 func (a *App) setupSystemTray() {
-	openSettings := func() {
-		w := a.app.NewWindow("Fyne Settings")
-		w.SetContent(settings.NewSettings().LoadAppearanceScreen(w))
-		w.Show()
-	}
 	a.tray = a.app.NewWindow("System Tray")
 	a.tray.SetMaster()
 	if desk, ok := a.app.(desktop.App); ok {
@@ -81,10 +76,13 @@ func (a *App) setupSystemTray() {
 					a.app.OpenURL(url)
 				})
 		menuItemSettings := fyne.
-			NewMenuItem("Settings", openSettings)
+			NewMenuItem("Settings", a.settingsWindow)
+		menuItemStats := fyne.
+			NewMenuItem("Show Stats", a.statsWindow)
 		menu := fyne.NewMenu(a.Name,
 			menuItemAbout,
 			menuItemSettings,
+			menuItemStats,
 			menuItemToggleNotifications,
 			menuItemToggleKeyTracker,
 			menuItemIssue,
@@ -92,4 +90,32 @@ func (a *App) setupSystemTray() {
 		desk.SetSystemTrayMenu(menu)
 	}
 	a.tray.Hide()
+}
+
+func (a *App) settingsWindow() {
+	w := a.app.NewWindow("Fyne Settings")
+	w.SetContent(settings.NewSettings().LoadAppearanceScreen(w))
+	w.Show()
+}
+
+func (a *App) statsWindow() {
+	tableData := [3][2]string{
+		{"Checked:", fmt.Sprintf("%d", stats.GetCheckedTotal())},
+		{"Corrected:", fmt.Sprintf("%d", stats.GetCorrectedTotal())},
+		{"Accuracy:", fmt.Sprintf("%.2f%%", stats.CalcAccuracy())},
+	}
+	list := widget.NewTable(
+		func() (int, int) {
+			return len(tableData), len(tableData[0])
+		},
+		func() fyne.CanvasObject {
+			return widget.NewLabel("Corrected:")
+		},
+		func(i widget.TableCellID, o fyne.CanvasObject) {
+			o.(*widget.Label).SetText(tableData[i.Row][i.Col])
+		})
+	w := a.app.NewWindow("Stats")
+	w.SetContent(list)
+	w.Resize(fyne.NewSize(164, 144))
+	w.Show()
 }
