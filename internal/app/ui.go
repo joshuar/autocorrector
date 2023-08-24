@@ -99,23 +99,22 @@ func (a *App) settingsWindow() {
 }
 
 func (a *App) statsWindow() {
-	tableData := [3][2]string{
-		{"Checked:", fmt.Sprintf("%d", stats.GetCheckedTotal())},
-		{"Corrected:", fmt.Sprintf("%d", stats.GetCorrectedTotal())},
-		{"Accuracy:", fmt.Sprintf("%.2f%%", stats.CalcAccuracy())},
-	}
-	list := widget.NewTable(
-		func() (int, int) {
-			return len(tableData), len(tableData[0])
-		},
-		func() fyne.CanvasObject {
-			return widget.NewLabel("Corrected:")
-		},
-		func(i widget.TableCellID, o fyne.CanvasObject) {
-			o.(*widget.Label).SetText(tableData[i.Row][i.Col])
-		})
+	lifetimeStatsLabel := container.New(layout.NewHBoxLayout(),
+		layout.NewSpacer(),
+		widget.NewLabel("Lifetime Stats"),
+		layout.NewSpacer())
+	lifetimeStatsChecked := widget.NewLabel(fmt.Sprintf("Checked: %d", stats.GetCheckedTotal()))
+	lifetimeStatsCorrected := widget.NewLabel(fmt.Sprintf("Corrected: %d", stats.GetCorrectedTotal()))
+	lifetimeStatsAccuracy := widget.NewLabel(fmt.Sprintf("Accuracy: %.2f%%", stats.CalcAccuracy()))
+	lifetimeStatsGrid := container.New(layout.NewGridLayout(3),
+		lifetimeStatsChecked,
+		lifetimeStatsCorrected,
+		lifetimeStatsAccuracy)
 	w := a.app.NewWindow("Stats")
-	w.SetContent(list)
+	content := container.New(layout.NewVBoxLayout(),
+		lifetimeStatsLabel,
+		lifetimeStatsGrid)
+	w.SetContent(content)
 	w.Resize(fyne.NewSize(164, 144))
 	w.Show()
 }
