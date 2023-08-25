@@ -3,22 +3,12 @@
 // This software is released under the MIT License.
 // https://opensource.org/licenses/MIT
 
-package wordstats
+package stats
 
 import "sync/atomic"
 
-type SessionStats struct {
-	KeysPressed      counter
-	BackSpacePressed counter
-}
-
-func (s *SessionStats) Efficiency() float64 {
-	if s.KeysPressed.Get() == 0 {
-		return 0
-	}
-	keys := s.KeysPressed.Get()
-	bs := s.BackSpacePressed.Get()
-	return float64(bs) / float64(keys) * 100
+type Stats struct {
+	SessionStats
 }
 
 type counter struct {

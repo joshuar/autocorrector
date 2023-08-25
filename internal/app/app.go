@@ -14,6 +14,7 @@ import (
 	"github.com/joshuar/autocorrector/internal/corrections"
 	"github.com/joshuar/autocorrector/internal/handler"
 	"github.com/joshuar/autocorrector/internal/keytracker"
+	"github.com/joshuar/autocorrector/internal/stats"
 	"github.com/joshuar/autocorrector/internal/word"
 	"github.com/joshuar/autocorrector/internal/wordstats"
 	"github.com/rs/zerolog/log"
@@ -26,9 +27,9 @@ var Version string
 var debugAppID = ""
 
 var keyTracker *keytracker.KeyTracker
-var stats *wordstats.WordStats
+var wordStats *wordstats.WordStats
 var correctionsList *corrections.Corrections
-var statsTracker *wordstats.Stats
+var statsTracker *stats.Stats
 
 const (
 	Name      = "autocorrector"
@@ -55,9 +56,9 @@ func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
 	handler := handler.NewHandler()
 	correctionsList = corrections.NewCorrections()
-	statsTracker = &wordstats.Stats{}
+	statsTracker = &stats.Stats.Stats{}
 	keyTracker = keytracker.NewKeyTracker(handler.WordCh, statsTracker)
-	stats = wordstats.RunStats()
+	wordStats = wordstats.RunStats()
 
 	go func() {
 		for {
@@ -75,7 +76,7 @@ func (a *App) Run() {
 	go func() {
 		for newWord := range handler.WordCh {
 			log.Debug().Msgf("Checking word: %s", newWord.Word)
-			stats.Checked <- newWord.Word
+			wordStats.Checked <- newWord.Word
 			if correction, ok := correctionsList.CheckWord(newWord.Word); ok {
 				handler.CorrectionCh <- word.WordDetails{
 					Word:       newWord.Word,
@@ -89,7 +90,7 @@ func (a *App) Run() {
 	go func() {
 		for correction := range handler.CorrectionCh {
 			keyTracker.CorrectWord(correction)
-			stats.Corrected <- [2]string{correction.Word, correction.Correction}
+			wordStats.Corrected <- [2]string{correction.Word, correction.Correction}
 			handler.NotificationsCh <- fyne.Notification{
 				Title:   "Correction!",
 				Content: fmt.Sprintf("Corrected %s with %s", correction.Word, correction.Correction),

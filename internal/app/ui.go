@@ -103,9 +103,9 @@ func (a *App) statsWindow() {
 		layout.NewSpacer(),
 		widget.NewLabel("Lifetime Stats"),
 		layout.NewSpacer())
-	lifetimeStatsChecked := widget.NewLabel(fmt.Sprintf("Checked: %d", stats.GetCheckedTotal()))
-	lifetimeStatsCorrected := widget.NewLabel(fmt.Sprintf("Corrected: %d", stats.GetCorrectedTotal()))
-	lifetimeStatsAccuracy := widget.NewLabel(fmt.Sprintf("Accuracy: %.2f%%", stats.CalcAccuracy()))
+	lifetimeStatsChecked := widget.NewLabel(fmt.Sprintf("Checked: %d", wordStats.GetCheckedTotal()))
+	lifetimeStatsCorrected := widget.NewLabel(fmt.Sprintf("Corrected: %d", wordStats.GetCorrectedTotal()))
+	lifetimeStatsAccuracy := widget.NewLabel(fmt.Sprintf("Accuracy: %.2f%%", wordStats.CalcAccuracy()))
 	lifetimeStatsGrid := container.New(layout.NewGridLayout(3),
 		lifetimeStatsChecked,
 		lifetimeStatsCorrected,

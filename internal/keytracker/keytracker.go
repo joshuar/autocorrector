@@ -10,8 +10,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/joshuar/autocorrector/internal/stats"
 	"github.com/joshuar/autocorrector/internal/word"
-	"github.com/joshuar/autocorrector/internal/wordstats"
 	kbd "github.com/joshuar/gokbd"
 	"github.com/rs/zerolog/log"
 )
@@ -25,7 +25,7 @@ type KeyTracker struct {
 	paused    bool
 }
 
-func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails, stats *wordstats.Stats) {
+func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails, stats *stats.Stats) {
 	charBuf := new(bytes.Buffer)
 	patternBuf := newPatternBuf(3)
 	log.Debug().Msg("Slurping words...")
@@ -101,7 +101,7 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(wordCh chan word.WordDetails, stats *wordstats.Stats) *KeyTracker {
+func NewKeyTracker(wordCh chan word.WordDetails, stats *stats.Stats) *KeyTracker {
 	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
 	if err != nil {
 		log.Error().Err(err).Msg("Could not open a new virtual keyboard.")
