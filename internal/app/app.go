@@ -28,6 +28,7 @@ var debugAppID = ""
 var keyTracker *keytracker.KeyTracker
 var stats *wordstats.WordStats
 var correctionsList *corrections.Corrections
+var statsTracker *wordstats.Stats
 
 const (
 	Name      = "autocorrector"
@@ -54,7 +55,8 @@ func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
 	handler := handler.NewHandler()
 	correctionsList = corrections.NewCorrections()
-	keyTracker = keytracker.NewKeyTracker(handler.WordCh)
+	statsTracker = &wordstats.Stats{}
+	keyTracker = keytracker.NewKeyTracker(handler.WordCh, statsTracker)
 	stats = wordstats.RunStats()
 
 	go func() {

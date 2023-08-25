@@ -110,10 +110,23 @@ func (a *App) statsWindow() {
 		lifetimeStatsChecked,
 		lifetimeStatsCorrected,
 		lifetimeStatsAccuracy)
+	sessionStatsLabel := container.New(layout.NewHBoxLayout(),
+		layout.NewSpacer(),
+		widget.NewLabel("Session Stats"),
+		layout.NewSpacer())
+	sessionStatsKeysPressed := widget.NewLabel(fmt.Sprintf("Keys Pressed: %d", statsTracker.SessionStats.KeysPressed.Get()))
+	sessionStatsBackspacePressed := widget.NewLabel(fmt.Sprintf("Backspace Pressed: %d", statsTracker.SessionStats.BackSpacePressed.Get()))
+	sessionStatsEfficiency := widget.NewLabel(fmt.Sprintf("Correction Rate: %.2f%%", statsTracker.SessionStats.Efficiency()))
+	sessionStatsGrid := container.New(layout.NewGridLayout(3),
+		sessionStatsBackspacePressed,
+		sessionStatsKeysPressed,
+		sessionStatsEfficiency)
 	w := a.app.NewWindow("Stats")
 	content := container.New(layout.NewVBoxLayout(),
 		lifetimeStatsLabel,
-		lifetimeStatsGrid)
+		lifetimeStatsGrid,
+		sessionStatsLabel,
+		sessionStatsGrid)
 	w.SetContent(content)
 	w.Resize(fyne.NewSize(164, 144))
 	w.Show()

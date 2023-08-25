@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/joshuar/autocorrector/internal/word"
+	"github.com/joshuar/autocorrector/internal/wordstats"
 	kbd "github.com/joshuar/gokbd"
 	"github.com/rs/zerolog/log"
 )
@@ -24,7 +25,7 @@ type KeyTracker struct {
 	paused    bool
 }
 
-func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails) {
+func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails, stats *wordstats.Stats) {
 	charBuf := new(bytes.Buffer)
 	patternBuf := newPatternBuf(3)
 	log.Debug().Msg("Slurping words...")
@@ -40,6 +41,7 @@ func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails) {
 			switch {
 			case k.IsBackspace():
 				// backspace key
+				stats.BackSpacePressed.Inc()
 				if charBuf.Len() > 0 {
 					charBuf.Truncate(charBuf.Len() - 1)
 				}
@@ -51,6 +53,7 @@ func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails) {
 				//
 				// most other punctuation should indicate end of word, so
 				// handle that
+				stats.KeysPressed.Inc()
 				if charBuf.Len() > 0 {
 					wordCh <- word.WordDetails{
 						Word:  charBuf.String(),
@@ -61,6 +64,7 @@ func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails) {
 			default:
 				// case unicode.IsDigit(k.AsRune), unicode.IsLetter(k.AsRune):
 				// a letter or number
+				stats.KeysPressed.Inc()
 				_, err := charBuf.WriteRune(k.AsRune)
 				if err != nil {
 					log.Debug().Caller().Err(err).
@@ -97,7 +101,7 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(wordCh chan word.WordDetails) *KeyTracker {
+func NewKeyTracker(wordCh chan word.WordDetails, stats *wordstats.Stats) *KeyTracker {
 	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
 	if err != nil {
 		log.Error().Err(err).Msg("Could not open a new virtual keyboard.")
@@ -108,6 +112,6 @@ func NewKeyTracker(wordCh chan word.WordDetails) *KeyTracker {
 		kbdEvents: kbd.SnoopAllKeyboards(kbd.OpenAllKeyboardDevices()),
 		paused:    false,
 	}
-	go kt.slurpWords(wordCh)
+	go kt.slurpWords(wordCh, stats)
 	return kt
 }
