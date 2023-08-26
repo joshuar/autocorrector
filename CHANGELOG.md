@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0](https://github.com/joshuar/autocorrector/compare/v2.0.0...v2.1.0) (2023-08-25)
+
+
+### Features
+
+* **app,wordstats:** start tracking session stats ([091d823](https://github.com/joshuar/autocorrector/commit/091d823941cd683e875f8c31aec5eee7345ccc99))
+* **app:** better layout and label for lifetime stats ([84a77c9](https://github.com/joshuar/autocorrector/commit/84a77c9c97260f9e4df3065b3b852b5652814585))
+
 ## [2.0.0](https://github.com/joshuar/autocorrector/compare/v1.1.2...v2.0.0) (2023-06-26)
 
 
