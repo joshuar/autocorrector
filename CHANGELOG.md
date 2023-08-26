@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/joshuar/autocorrector/compare/v2.1.0...v2.1.1) (2023-08-26)
+
+
+### Bug Fixes
+
+* **app:** auto-complete mistake ([696a54a](https://github.com/joshuar/autocorrector/commit/696a54a31b788d324715f3bfc039bf96b86ce57b))
+
 ## [2.1.0](https://github.com/joshuar/autocorrector/compare/v2.0.0...v2.1.0) (2023-08-25)
 
 
