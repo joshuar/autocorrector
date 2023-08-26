@@ -56,7 +56,7 @@ func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
 	handler := handler.NewHandler()
 	correctionsList = corrections.NewCorrections()
-	statsTracker = &stats.Stats.Stats{}
+	statsTracker = &stats.Stats{}
 	keyTracker = keytracker.NewKeyTracker(handler.WordCh, statsTracker)
 	wordStats = wordstats.RunStats()
 
