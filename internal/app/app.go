@@ -9,14 +9,17 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
 
 	"fyne.io/fyne/v2"
 	"github.com/joshuar/autocorrector/internal/corrections"
+	"github.com/joshuar/autocorrector/internal/db"
 	"github.com/joshuar/autocorrector/internal/handler"
 	"github.com/joshuar/autocorrector/internal/keytracker"
-	"github.com/joshuar/autocorrector/internal/stats"
 	"github.com/joshuar/autocorrector/internal/word"
-	"github.com/joshuar/autocorrector/internal/wordstats"
 	"github.com/rs/zerolog/log"
 )
 
@@ -27,9 +30,9 @@ var Version string
 var debugAppID = ""
 
 var keyTracker *keytracker.KeyTracker
-var wordStats *wordstats.WordStats
 var correctionsList *corrections.Corrections
-var statsTracker *stats.Stats
+
+var configPath = filepath.Join(os.Getenv("HOME"), ".config", "autocorrector")
 
 const (
 	Name      = "autocorrector"
@@ -54,11 +57,18 @@ func New() *App {
 
 func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
+	doneCh := make(chan struct{})
 	handler := handler.NewHandler()
 	correctionsList = corrections.NewCorrections()
-	statsTracker = &stats.Stats{}
-	keyTracker = keytracker.NewKeyTracker(handler.WordCh, statsTracker)
-	wordStats = wordstats.RunStats()
+	if err := createDir(configPath); err != nil {
+		log.Fatal().Err(err).Msg("Could not create config directory.")
+	}
+	stats, err := db.RunStats(appCtx, configPath)
+	defer close(stats.Done)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to start stats tracking.")
+	}
+	keyTracker = keytracker.NewKeyTracker(handler.WordCh, stats)
 
 	go func() {
 		for {
@@ -76,7 +86,7 @@ func (a *App) Run() {
 	go func() {
 		for newWord := range handler.WordCh {
 			log.Debug().Msgf("Checking word: %s", newWord.Word)
-			wordStats.Checked <- newWord.Word
+			stats.IncCheckedCounter()
 			if correction, ok := correctionsList.CheckWord(newWord.Word); ok {
 				handler.CorrectionCh <- word.WordDetails{
 					Word:       newWord.Word,
@@ -90,7 +100,7 @@ func (a *App) Run() {
 	go func() {
 		for correction := range handler.CorrectionCh {
 			keyTracker.CorrectWord(correction)
-			wordStats.Corrected <- [2]string{correction.Word, correction.Correction}
+			stats.Corrected <- db.Correction{Word: correction.Word, Correction: correction.Correction}
 			handler.NotificationsCh <- fyne.Notification{
 				Title:   "Correction!",
 				Content: fmt.Sprintf("Corrected %s with %s", correction.Word, correction.Correction),
@@ -98,7 +108,37 @@ func (a *App) Run() {
 		}
 	}()
 
-	a.setupSystemTray()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Debug().Msg("Ctrl-C pressed.")
+		close(doneCh)
+	}()
+	go func() {
+		<-doneCh
+		stats.Save()
+		log.Debug().Msg("Agent done.")
+		os.Exit(0)
+	}()
+	go func() {
+		<-appCtx.Done()
+		log.Debug().Msg("Context canceled.")
+		os.Exit(1)
+	}()
+
+	a.setupSystemTray(stats)
 	a.app.Run()
 	cancelfunc()
+}
+
+func createDir(path string) error {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		log.Debug().Str("directory", path).Msg("No config directory, creating new one.")
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			return err
+		}
+	}
+	return nil
 }

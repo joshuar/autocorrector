@@ -10,7 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/joshuar/autocorrector/internal/stats"
+	"github.com/joshuar/autocorrector/internal/db"
 	"github.com/joshuar/autocorrector/internal/word"
 	kbd "github.com/joshuar/gokbd"
 	"github.com/rs/zerolog/log"
@@ -25,7 +25,7 @@ type KeyTracker struct {
 	paused    bool
 }
 
-func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails, stats *stats.Stats) {
+func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails, stats *db.Stats) {
 	charBuf := new(bytes.Buffer)
 	patternBuf := newPatternBuf(3)
 	log.Debug().Msg("Slurping words...")
@@ -41,7 +41,7 @@ func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails, stats *stats.Stat
 			switch {
 			case k.IsBackspace():
 				// backspace key
-				stats.BackSpacePressed.Inc()
+				stats.IncBackspaceCounter()
 				if charBuf.Len() > 0 {
 					charBuf.Truncate(charBuf.Len() - 1)
 				}
@@ -53,7 +53,7 @@ func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails, stats *stats.Stat
 				//
 				// most other punctuation should indicate end of word, so
 				// handle that
-				stats.KeysPressed.Inc()
+				stats.IncKeyCounter()
 				if charBuf.Len() > 0 {
 					wordCh <- word.WordDetails{
 						Word:  charBuf.String(),
@@ -64,7 +64,7 @@ func (kt *KeyTracker) slurpWords(wordCh chan word.WordDetails, stats *stats.Stat
 			default:
 				// case unicode.IsDigit(k.AsRune), unicode.IsLetter(k.AsRune):
 				// a letter or number
-				stats.KeysPressed.Inc()
+				stats.IncKeyCounter()
 				_, err := charBuf.WriteRune(k.AsRune)
 				if err != nil {
 					log.Debug().Caller().Err(err).
@@ -101,7 +101,7 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(wordCh chan word.WordDetails, stats *stats.Stats) *KeyTracker {
+func NewKeyTracker(wordCh chan word.WordDetails, stats *db.Stats) *KeyTracker {
 	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
 	if err != nil {
 		log.Error().Err(err).Msg("Could not open a new virtual keyboard.")

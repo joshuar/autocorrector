@@ -17,6 +17,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/joshuar/autocorrector/internal/db"
 )
 
 const (
@@ -37,7 +38,7 @@ func newUI() fyne.App {
 	return a
 }
 
-func (a *App) setupSystemTray() {
+func (a *App) setupSystemTray(stats *db.Stats) {
 	a.tray = a.app.NewWindow("System Tray")
 	a.tray.SetMaster()
 	if desk, ok := a.app.(desktop.App); ok {
@@ -78,7 +79,9 @@ func (a *App) setupSystemTray() {
 		menuItemSettings := fyne.
 			NewMenuItem("Settings", a.settingsWindow)
 		menuItemStats := fyne.
-			NewMenuItem("Show Stats", a.statsWindow)
+			NewMenuItem("Show Stats", func() {
+				a.statsWindow(stats)
+			})
 		menu := fyne.NewMenu(a.Name,
 			menuItemAbout,
 			menuItemSettings,
@@ -98,35 +101,21 @@ func (a *App) settingsWindow() {
 	w.Show()
 }
 
-func (a *App) statsWindow() {
-	lifetimeStatsLabel := container.New(layout.NewHBoxLayout(),
-		layout.NewSpacer(),
-		widget.NewLabel("Lifetime Stats"),
-		layout.NewSpacer())
-	lifetimeStatsChecked := widget.NewLabel(fmt.Sprintf("Checked: %d", wordStats.GetCheckedTotal()))
-	lifetimeStatsCorrected := widget.NewLabel(fmt.Sprintf("Corrected: %d", wordStats.GetCorrectedTotal()))
-	lifetimeStatsAccuracy := widget.NewLabel(fmt.Sprintf("Accuracy: %.2f%%", wordStats.CalcAccuracy()))
-	lifetimeStatsGrid := container.New(layout.NewGridLayout(3),
-		lifetimeStatsChecked,
-		lifetimeStatsCorrected,
-		lifetimeStatsAccuracy)
-	sessionStatsLabel := container.New(layout.NewHBoxLayout(),
-		layout.NewSpacer(),
-		widget.NewLabel("Session Stats"),
-		layout.NewSpacer())
-	sessionStatsKeysPressed := widget.NewLabel(fmt.Sprintf("Keys Pressed: %d", statsTracker.SessionStats.KeysPressed.Get()))
-	sessionStatsBackspacePressed := widget.NewLabel(fmt.Sprintf("Backspace Pressed: %d", statsTracker.SessionStats.BackSpacePressed.Get()))
-	sessionStatsEfficiency := widget.NewLabel(fmt.Sprintf("Correction Rate: %.2f%%", statsTracker.SessionStats.Efficiency()))
-	sessionStatsGrid := container.New(layout.NewGridLayout(3),
-		sessionStatsBackspacePressed,
-		sessionStatsKeysPressed,
-		sessionStatsEfficiency)
+func (a *App) statsWindow(stats *db.Stats) {
 	w := a.app.NewWindow("Stats")
 	content := container.New(layout.NewVBoxLayout(),
-		lifetimeStatsLabel,
-		lifetimeStatsGrid,
-		sessionStatsLabel,
-		sessionStatsGrid)
+		container.New(layout.NewHBoxLayout(),
+			layout.NewSpacer(),
+			widget.NewLabel("Lifetime Stats"),
+			layout.NewSpacer()),
+		container.New(layout.NewGridLayout(3),
+			widget.NewLabel(fmt.Sprintf("Checked: %d", stats.GetCheckedTotal())),
+			widget.NewLabel(fmt.Sprintf("Corrected: %d", stats.GetCorrectedTotal())),
+			widget.NewLabel(fmt.Sprintf("Accuracy: %.2f%%", stats.GetAccuracy()))),
+		container.New(layout.NewGridLayout(3),
+			widget.NewLabel(fmt.Sprintf("Keys Pressed: %d", stats.GetKeysPressed())),
+			widget.NewLabel(fmt.Sprintf("Backspace Pressed: %d", stats.GetBackspacePressed())),
+			widget.NewLabel(fmt.Sprintf("Correction Rate: %.2f%%", stats.GetEfficiency()))))
 	w.SetContent(content)
 	w.Resize(fyne.NewSize(164, 144))
 	w.Show()

@@ -13,7 +13,6 @@ import (
 )
 
 func main() {
-	ensureNotEUID()
 	cmd.Execute()
 }
 
@@ -21,7 +20,7 @@ func main() {
 //
 // ensureNotEUID aborts the program if it is running setuid something,
 // or being invoked by root.
-func ensureNotEUID() {
+func init() {
 	euid := syscall.Geteuid()
 	uid := syscall.Getuid()
 	egid := syscall.Getegid()
