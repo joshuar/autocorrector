@@ -44,6 +44,10 @@ func (a *App) setupSystemTray(stats *db.Stats) {
 	a.tray = a.app.NewWindow("System Tray")
 	a.tray.SetMaster()
 	if desk, ok := a.app.(desktop.App); ok {
+		menuItemQuit := fyne.NewMenuItem("Quit", func() {
+			a.Stop()
+		})
+		menuItemQuit.IsQuit = true
 		menuItemAbout := fyne.
 			NewMenuItem("About",
 				func() {
@@ -91,7 +95,8 @@ func (a *App) setupSystemTray(stats *db.Stats) {
 			menuItemToggleNotifications,
 			menuItemToggleKeyTracker,
 			menuItemIssue,
-			menuItemFeatureRequest)
+			menuItemFeatureRequest,
+			menuItemQuit)
 		desk.SetSystemTrayMenu(menu)
 	}
 	a.tray.Hide()

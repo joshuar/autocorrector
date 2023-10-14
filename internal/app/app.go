@@ -44,6 +44,7 @@ type App struct {
 	tray              fyne.Window
 	Name, Version     string
 	showNotifications bool
+	Done              chan struct{}
 }
 
 func New() *App {
@@ -52,12 +53,12 @@ func New() *App {
 		Name:              Name,
 		Version:           Version,
 		showNotifications: false,
+		Done:              make(chan struct{}),
 	}
 }
 
 func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
-	doneCh := make(chan struct{})
 	handler := handler.NewHandler()
 	correctionsList = corrections.NewCorrections()
 	if err := createDir(configPath); err != nil {
@@ -113,10 +114,10 @@ func (a *App) Run() {
 	go func() {
 		<-c
 		log.Debug().Msg("Ctrl-C pressed.")
-		close(doneCh)
+		close(a.Done)
 	}()
 	go func() {
-		<-doneCh
+		<-a.Done
 		stats.Save()
 		log.Debug().Msg("Agent done.")
 		os.Exit(0)
@@ -130,6 +131,10 @@ func (a *App) Run() {
 	a.setupSystemTray(stats)
 	a.app.Run()
 	cancelfunc()
+}
+
+func (a *App) Stop() {
+	close(a.Done)
 }
 
 func createDir(path string) error {
