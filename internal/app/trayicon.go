@@ -10,6 +10,19 @@
 
 package app
 
+import (
+	_ "embed"
+)
+
+//go:embed assets/icon/autocorrector.png
+var defaultIconData []byte
+
+//go:embed assets/icon/autocorrector_disabled.png
+var disabledIconData []byte
+
+//go:embed assets/icon/autocorrector_notifications.png
+var notifyingIconData []byte
+
 type trayIcon struct{}
 
 func (icon trayIcon) Name() string {

@@ -6,6 +6,7 @@
 package app
 
 import (
+	_ "embed"
 	"fmt"
 	"net/url"
 
@@ -20,10 +21,11 @@ import (
 	"github.com/joshuar/autocorrector/internal/db"
 )
 
-const (
-	issueURL          = "https://github.com/joshuar/autocorrector/issues/new?assignees=joshuar&labels=&template=bug_report.md&title=%5BBUG%5D"
-	featureRequestURL = "https://github.com/joshuar/autocorrector/issues/new?assignees=&labels=&template=feature_request.md&title="
-)
+//go:embed assets/urls/issueURL
+var issueURL string
+
+//go:embed assets/urls/featureRequestURL
+var featureRequestURL string
 
 func newUI() fyne.App {
 	var a fyne.App
