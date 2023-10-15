@@ -19,15 +19,20 @@
 ## Managing corrections
 
 - Autocorrector looks for a list of corrections in a `corrections.toml` file
-  located in `$HOME/.config/autocorrector/corrections.toml` by default.
+  located in one of the following places:
+  - `$HOME/.config/autocorrector/corrections.toml` (does not exist by default)
+  - `/usr/share/autocorrector/corrections.toml`
 - This file is [TOML formatted](https://toml.io/en/).
-- A default list of common English typos is provided, sourced from
-  [here](https://www.autohotkey.com/download/AutoCorrect.ahk).
-- You can add/remove corrections from the file and Autocorrector, if running,
+- The default list (`/usr/share/autocorrector/corrections.toml`) is
+  machine-generated from [Wikipedia's list of common
+  mispellings](https://en.wikipedia.org/wiki/Wikipedia:Lists_of_common_misspellings).
+  As it is machine-generated, there may be some unwanted or unexpected
+  corrections. Some cleaning of the list is done. The code for generating the
+  default list can be found in the `tools/scraper` directory of the source
+  code repository.
+- You can add/remove corrections by copying the default list to
+  `$HOME/.config/autocorrector/corrections.toml` and editing the file. Autocorrector, if running,
   will pick up the changes automatically.
-- The tray icon menu provides a convenient way to edit the file, select the
-  *Edit* option and the corrections file will open in your preferred text editor
-  for quick editing.
 
 ## Other features
 
