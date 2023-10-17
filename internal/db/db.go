@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -69,7 +68,7 @@ func (c *Counters) Write(file string) error {
 }
 
 func OpenCounters(file string) (*Counters, error) {
-	log.Debug().Msgf("Using counters file %s", file)
+	log.Info().Str("file", file).Msg("Opened counters file.")
 	fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0640)
 	if err != nil {
 		return nil, err
@@ -83,30 +82,14 @@ func OpenCounters(file string) (*Counters, error) {
 	return &counters, nil
 }
 
-func OpenCorrections(file string) (zerolog.Logger, error) {
-	log.Debug().Msgf("Using corrections log %s", file)
-	fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0640)
-	if err != nil {
-		return zerolog.New(os.Stderr).With().Timestamp().Logger(), nil
-	}
-	return zerolog.New(fs).With().Timestamp().Logger(), nil
-}
-
 type Stats struct {
-	counters                      *Counters
-	corrections                   zerolog.Logger
-	countersFile, correctionsFile string
-	Corrected                     chan Correction
-	Done                          chan struct{}
+	counters     *Counters
+	countersFile string
+	Done         chan struct{}
 }
 
-func (s *Stats) addCorrected() {
-	for c := range s.Corrected {
-		s.counters.WordsCorrected.Inc()
-		s.corrections.Info().
-			Str("word", c.Word).Str("correction", c.Correction).
-			Msg("Corrected.")
-	}
+func (s *Stats) IncCorrectedCounter() {
+	s.counters.WordsCorrected.Inc()
 }
 
 func (s *Stats) IncCheckedCounter() {
@@ -153,21 +136,13 @@ func (s *Stats) Save() {
 
 func RunStats(ctx context.Context, path string) (*Stats, error) {
 	s := &Stats{
-		Corrected:       make(chan Correction, 1),
-		Done:            make(chan struct{}),
-		countersFile:    filepath.Join(path, "counters"),
-		correctionsFile: filepath.Join(path, "corrections.log"),
+		Done:         make(chan struct{}),
+		countersFile: filepath.Join(path, "counters"),
 	}
 	c, err := OpenCounters(s.countersFile)
 	if err != nil {
 		return nil, errors.Join(errors.New("could not open counters file"), err)
 	}
 	s.counters = c
-	l, err := OpenCorrections(s.correctionsFile)
-	if err != nil {
-		return nil, errors.Join(errors.New("could not open corrections file"), err)
-	}
-	s.corrections = l
-	go s.addCorrected()
 	return s, nil
 }

@@ -60,9 +60,12 @@ func New() *App {
 func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
 	handler := handler.NewHandler()
-	correctionsList = corrections.NewCorrections()
 	if err := createDir(configPath); err != nil {
 		log.Fatal().Err(err).Msg("Could not create config directory.")
+	}
+	correctionsList, err := corrections.NewCorrections()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to open corrections file.")
 	}
 	stats, err := db.RunStats(appCtx, configPath)
 	defer close(stats.Done)
@@ -101,7 +104,7 @@ func (a *App) Run() {
 	go func() {
 		for correction := range handler.CorrectionCh {
 			keyTracker.CorrectWord(correction)
-			stats.Corrected <- db.Correction{Word: correction.Word, Correction: correction.Correction}
+			stats.IncCorrectedCounter()
 			handler.NotificationsCh <- fyne.Notification{
 				Title:   "Correction!",
 				Content: fmt.Sprintf("Corrected %s with %s", correction.Word, correction.Correction),
