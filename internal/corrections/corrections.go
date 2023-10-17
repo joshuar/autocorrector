@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog/log"
 )
@@ -28,7 +27,6 @@ func (c *Corrections) CheckWord(word string) (string, bool) {
 	c.mu.Lock()
 	correction, ok := c.correctionsList[word]
 	c.mu.Unlock()
-	spew.Dump(correction)
 	return correction, ok
 }
 
