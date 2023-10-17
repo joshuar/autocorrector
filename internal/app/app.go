@@ -17,9 +17,7 @@ import (
 	"fyne.io/fyne/v2"
 	"github.com/joshuar/autocorrector/internal/corrections"
 	"github.com/joshuar/autocorrector/internal/db"
-	"github.com/joshuar/autocorrector/internal/handler"
 	"github.com/joshuar/autocorrector/internal/keytracker"
-	"github.com/joshuar/autocorrector/internal/word"
 	"github.com/rs/zerolog/log"
 )
 
@@ -44,7 +42,16 @@ type App struct {
 	tray              fyne.Window
 	Name, Version     string
 	showNotifications bool
+	notificationsCh   chan *keytracker.Correction
 	Done              chan struct{}
+}
+
+func (a *App) ShowNotifications() bool {
+	return a.showNotifications
+}
+
+func (a *App) NotificationCh() chan *keytracker.Correction {
+	return a.notificationsCh
 }
 
 func New() *App {
@@ -53,61 +60,35 @@ func New() *App {
 		Name:              Name,
 		Version:           Version,
 		showNotifications: false,
+		notificationsCh:   make(chan *keytracker.Correction),
 		Done:              make(chan struct{}),
 	}
 }
 
 func (a *App) Run() {
 	appCtx, cancelfunc := context.WithCancel(context.Background())
-	handler := handler.NewHandler()
 	if err := createDir(configPath); err != nil {
 		log.Fatal().Err(err).Msg("Could not create config directory.")
-	}
-	correctionsList, err := corrections.NewCorrections()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to open corrections file.")
 	}
 	stats, err := db.RunStats(appCtx, configPath)
 	defer close(stats.Done)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to start stats tracking.")
 	}
-	keyTracker = keytracker.NewKeyTracker(handler.WordCh, stats)
+	if err := keytracker.NewKeyTracker(a, stats); err != nil {
+		log.Fatal().Err(err).Msg("Failed to start key tracking.")
+	}
 
 	go func() {
 		for {
 			select {
 			case <-appCtx.Done():
 				return
-			case notification := <-handler.NotificationsCh:
-				if a.showNotifications {
-					a.app.SendNotification(&notification)
-				}
-			}
-		}
-	}()
-
-	go func() {
-		for newWord := range handler.WordCh {
-			log.Debug().Msgf("Checking word: %s", newWord.Word)
-			stats.IncCheckedCounter()
-			if correction, ok := correctionsList.CheckWord(newWord.Word); ok {
-				handler.CorrectionCh <- word.WordDetails{
-					Word:       newWord.Word,
-					Correction: correction,
-					Punct:      newWord.Punct,
-				}
-			}
-		}
-	}()
-
-	go func() {
-		for correction := range handler.CorrectionCh {
-			keyTracker.CorrectWord(correction)
-			stats.IncCorrectedCounter()
-			handler.NotificationsCh <- fyne.Notification{
-				Title:   "Correction!",
-				Content: fmt.Sprintf("Corrected %s with %s", correction.Word, correction.Correction),
+			case n := <-a.notificationsCh:
+				a.app.SendNotification(&fyne.Notification{
+					Title:   "Correction!",
+					Content: fmt.Sprintf("Corrected %s with %s", n.Word, n.Correction),
+				})
 			}
 		}
 	}()
