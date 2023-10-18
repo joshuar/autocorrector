@@ -11,13 +11,18 @@ import (
 	"unicode/utf8"
 
 	"github.com/joshuar/autocorrector/internal/corrections"
-	"github.com/joshuar/autocorrector/internal/db"
 	kbd "github.com/joshuar/gokbd"
 	"github.com/rs/zerolog/log"
 )
 
+type stats interface {
+	IncKeyCounter()
+	IncBackspaceCounter()
+	IncCheckedCounter()
+	IncCorrectedCounter()
+}
+
 type agent interface {
-	ShowNotifications() bool
 	NotificationCh() chan *Correction
 }
 
@@ -43,7 +48,7 @@ type KeyTracker struct {
 	paused    bool
 }
 
-func (kt *KeyTracker) slurpWords(wordCh chan *Correction, stats *db.Stats) {
+func (kt *KeyTracker) slurpWords(wordCh chan *Correction, stats stats) {
 	charBuf := new(bytes.Buffer)
 	patternBuf := newPatternBuf(3)
 	log.Debug().Msg("Slurping words...")
@@ -91,7 +96,7 @@ func (kt *KeyTracker) slurpWords(wordCh chan *Correction, stats *db.Stats) {
 	kt.CloseKeyTracker()
 }
 
-func (kt *KeyTracker) checkWord(wordCh chan *Correction, correctionCh chan *Correction, corrections *corrections.Corrections, stats *db.Stats) {
+func (kt *KeyTracker) checkWord(wordCh chan *Correction, correctionCh chan *Correction, corrections *corrections.Corrections, stats stats) {
 	for w := range wordCh {
 		log.Debug().Msgf("Checking word: %s", w.Word)
 		stats.IncCheckedCounter()
@@ -102,7 +107,7 @@ func (kt *KeyTracker) checkWord(wordCh chan *Correction, correctionCh chan *Corr
 	}
 }
 
-func (kt *KeyTracker) correctWord(correctionCh chan *Correction, agent agent, stats *db.Stats) {
+func (kt *KeyTracker) correctWord(correctionCh chan *Correction, agent agent, stats stats) {
 	for correction := range correctionCh {
 		if !kt.paused {
 			log.Debug().Msgf("Making correction %s to %s", correction.Word, correction.Correction)
@@ -117,9 +122,7 @@ func (kt *KeyTracker) correctWord(correctionCh chan *Correction, agent agent, st
 			kt.kbd.TypeString(correction.Correction + string(correction.Punct))
 		}
 		stats.IncCorrectedCounter()
-		if agent.ShowNotifications() {
-			agent.NotificationCh() <- correction
-		}
+		agent.NotificationCh() <- correction
 	}
 }
 
@@ -133,7 +136,7 @@ func (kt *KeyTracker) CloseKeyTracker() {
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(agent agent, stats *db.Stats) error {
+func NewKeyTracker(agent agent, stats stats) error {
 	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
 	if err != nil {
 		return err

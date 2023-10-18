@@ -67,7 +67,7 @@ func (c *Counters) Write(file string) error {
 	return nil
 }
 
-func OpenCounters(file string) (*Counters, error) {
+func openCounters(file string) (*Counters, error) {
 	log.Info().Str("file", file).Msg("Opened counters file.")
 	fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0640)
 	if err != nil {
@@ -139,7 +139,7 @@ func RunStats(ctx context.Context, path string) (*Stats, error) {
 		Done:         make(chan struct{}),
 		countersFile: filepath.Join(path, "counters"),
 	}
-	c, err := OpenCounters(s.countersFile)
+	c, err := openCounters(s.countersFile)
 	if err != nil {
 		return nil, errors.Join(errors.New("could not open counters file"), err)
 	}

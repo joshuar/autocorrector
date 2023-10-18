@@ -46,10 +46,6 @@ type App struct {
 	Done              chan struct{}
 }
 
-func (a *App) ShowNotifications() bool {
-	return a.showNotifications
-}
-
 func (a *App) NotificationCh() chan *keytracker.Correction {
 	return a.notificationsCh
 }
@@ -85,10 +81,12 @@ func (a *App) Run() {
 			case <-appCtx.Done():
 				return
 			case n := <-a.notificationsCh:
-				a.app.SendNotification(&fyne.Notification{
-					Title:   "Correction!",
-					Content: fmt.Sprintf("Corrected %s with %s", n.Word, n.Correction),
-				})
+				if a.showNotifications {
+					a.app.SendNotification(&fyne.Notification{
+						Title:   "Correction!",
+						Content: fmt.Sprintf("Corrected %s with %s", n.Word, n.Correction),
+					})
+				}
 			}
 		}
 	}()
