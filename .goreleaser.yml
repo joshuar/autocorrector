@@ -75,7 +75,7 @@ nfpms:
         dst: /usr/share/doc/autocorrector/USAGE.md
       - src: configs/corrections.toml
         dst: /usr/share/autocorrector/corrections.toml
-      - src: assets/icon/autocorrector.png
+      - src: internal/app/assets/icon/autocorrector.png
         dst: /usr/share/pixmaps/autocorrector.png
       - src: assets/autocorrector.desktop
         dst: /usr/share/applications/autocorrector.desktop
