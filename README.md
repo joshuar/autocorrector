@@ -44,7 +44,6 @@ The following Go libraries and tools made autocorrector infinitely easier:
   keys.
 - [fyne](https://fyne.io/): UI toolkit and system tray library.
 - [zerolog](https://github.com/rs/zerolog): logging library.
-- [Viper](https://github.com/spf13/viper): configuration file handling.
 - [Cobra](https://github.com/spf13/cobra): command-line interface.
 
 Check out more awesome Go things at the [Awesome Go

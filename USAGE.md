@@ -31,8 +31,7 @@
   default list can be found in the `tools/scraper` directory of the source
   code repository.
 - You can add/remove corrections by copying the default list to
-  `$HOME/.config/autocorrector/corrections.toml` and editing the file. Autocorrector, if running,
-  will pick up the changes automatically.
+  `$HOME/.config/autocorrector/corrections.toml` and editing the file.
 
 ## Other features
 
