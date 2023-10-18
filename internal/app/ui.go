@@ -19,6 +19,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/joshuar/autocorrector/internal/db"
+	"github.com/rs/zerolog/log"
 )
 
 //go:embed assets/urls/issueURL
@@ -68,7 +69,8 @@ func (a *App) setupSystemTray(stats *db.Stats) {
 		menuItemToggleKeyTracker := fyne.
 			NewMenuItem("Toggle Corrections",
 				func() {
-					keyTracker.Toggle()
+					log.Debug().Msg("Toggling corrections.")
+					a.Toggle()
 				})
 		menuItemIssue := fyne.
 			NewMenuItem("Report Issue",

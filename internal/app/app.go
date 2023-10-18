@@ -12,10 +12,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"fyne.io/fyne/v2"
-	"github.com/joshuar/autocorrector/internal/corrections"
 	"github.com/joshuar/autocorrector/internal/db"
 	"github.com/joshuar/autocorrector/internal/keytracker"
 	"github.com/rs/zerolog/log"
@@ -26,9 +26,6 @@ import (
 var Version string
 
 var debugAppID = ""
-
-var keyTracker *keytracker.KeyTracker
-var correctionsList *corrections.Corrections
 
 var configPath = filepath.Join(os.Getenv("HOME"), ".config", "autocorrector")
 
@@ -43,11 +40,18 @@ type App struct {
 	Name, Version     string
 	showNotifications bool
 	notificationsCh   chan *keytracker.Correction
+	paused            bool
+	toggleCh          chan bool
 	Done              chan struct{}
 }
 
 func (a *App) NotificationCh() chan *keytracker.Correction {
 	return a.notificationsCh
+}
+
+func (a *App) Toggle() {
+	a.paused = !a.paused
+	a.toggleCh <- a.paused
 }
 
 func New() *App {
@@ -57,24 +61,31 @@ func New() *App {
 		Version:           Version,
 		showNotifications: false,
 		notificationsCh:   make(chan *keytracker.Correction),
+		toggleCh:          make(chan bool),
 		Done:              make(chan struct{}),
 	}
 }
 
 func (a *App) Run() {
+	var wg sync.WaitGroup
 	appCtx, cancelfunc := context.WithCancel(context.Background())
 	if err := createDir(configPath); err != nil {
 		log.Fatal().Err(err).Msg("Could not create config directory.")
 	}
+
 	stats, err := db.RunStats(appCtx, configPath)
 	defer close(stats.Done)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to start stats tracking.")
 	}
-	if err := keytracker.NewKeyTracker(a, stats); err != nil {
-		log.Fatal().Err(err).Msg("Failed to start key tracking.")
+
+	keyTracker, err := keytracker.NewKeyTracker(a, stats)
+	defer close(keyTracker.ToggleCh)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Could not start keytracker.")
 	}
 
+	wg.Add(1)
 	go func() {
 		for {
 			select {
@@ -87,6 +98,8 @@ func (a *App) Run() {
 						Content: fmt.Sprintf("Corrected %s with %s", n.Word, n.Correction),
 					})
 				}
+			case v := <-a.toggleCh:
+				keyTracker.ToggleCh <- v
 			}
 		}
 	}()
@@ -112,6 +125,7 @@ func (a *App) Run() {
 
 	a.setupSystemTray(stats)
 	a.app.Run()
+	wg.Wait()
 	cancelfunc()
 }
 

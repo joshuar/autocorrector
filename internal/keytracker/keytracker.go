@@ -7,6 +7,7 @@ package keytracker
 
 import (
 	"bytes"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -46,6 +47,7 @@ type KeyTracker struct {
 	kbd       *kbd.VirtualKeyboardDevice
 	kbdEvents <-chan kbd.KeyEvent
 	paused    bool
+	ToggleCh  chan bool
 }
 
 func (kt *KeyTracker) slurpWords(wordCh chan *Correction, stats stats) {
@@ -126,35 +128,59 @@ func (kt *KeyTracker) correctWord(correctionCh chan *Correction, agent agent, st
 	}
 }
 
-func (kt *KeyTracker) Toggle() {
-	kt.paused = !kt.paused
-}
-
 // CloseKeyTracker shuts down the channels used for key tracking
 func (kt *KeyTracker) CloseKeyTracker() {
 	kt.kbd.Close()
 }
 
 // NewKeyTracker creates a new keyTracker struct
-func NewKeyTracker(agent agent, stats stats) error {
+func NewKeyTracker(agent agent, stats stats) (*KeyTracker, error) {
 	vKbd, err := kbd.NewVirtualKeyboard("autocorrector")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	kt := &KeyTracker{
 		kbd:       vKbd,
 		kbdEvents: kbd.SnoopAllKeyboards(kbd.OpenAllKeyboardDevices()),
 		paused:    false,
+		ToggleCh:  make(chan bool),
 	}
 	correctionsList, err := corrections.NewCorrections()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	correctionCh := make(chan *Correction)
-	wordCh := make(chan *Correction)
-	go kt.slurpWords(wordCh, stats)
-	go kt.checkWord(wordCh, correctionCh, correctionsList, stats)
-	go kt.correctWord(correctionCh, agent, stats)
-	return nil
+	go func() {
+		correctionCh := make(chan *Correction)
+		defer close(correctionCh)
+		wordCh := make(chan *Correction)
+		defer close(wordCh)
+
+		var wg sync.WaitGroup
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			kt.slurpWords(wordCh, stats)
+		}()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			kt.checkWord(wordCh, correctionCh, correctionsList, stats)
+		}()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			kt.correctWord(correctionCh, agent, stats)
+		}()
+		wg.Add(1)
+		go func() {
+			for v := range kt.ToggleCh {
+				kt.paused = v
+				log.Debug().Msgf("Keytracker paused: %t", kt.paused)
+			}
+		}()
+		wg.Wait()
+	}()
+	return kt, nil
 }
