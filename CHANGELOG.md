@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/joshuar/autocorrector/compare/v3.0.0...v3.0.1) (2023-10-18)
+
+
+### Miscellaneous Chores
+
+* release 3.0.1 packaging fixes ([5c4ff60](https://github.com/joshuar/autocorrector/commit/5c4ff60afaaa347224940c451845f3f2aa91fc4a))
+
 ## [3.0.0](https://github.com/joshuar/autocorrector/compare/v2.1.1...v3.0.0) (2023-10-18)
 
 
