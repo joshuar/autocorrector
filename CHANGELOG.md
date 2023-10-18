@@ -1,5 +1,31 @@
 # Changelog
 
+## [3.0.0](https://github.com/joshuar/autocorrector/compare/v2.1.1...v3.0.0) (2023-10-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **app,keytracker:** restructure corrections code
+* **db,app,corrections:** improve corrections tracking
+* **all:** improve stats tracking
+
+### Features
+
+* **all:** improve stats tracking ([35656f8](https://github.com/joshuar/autocorrector/commit/35656f84684e7076509baab3b0b81b4fdb4bae90))
+* **app,keytracker:** restructure corrections code ([b6ae8da](https://github.com/joshuar/autocorrector/commit/b6ae8daa5b6a16de960145a489212dc11bd9aa4f))
+* **app:** embed icons and urls rather than defining in code ([4f7f82d](https://github.com/joshuar/autocorrector/commit/4f7f82deaf481f14c91a53c65d7a56ca23e68edb))
+* **db,app,corrections:** improve corrections tracking ([1e811de](https://github.com/joshuar/autocorrector/commit/1e811de89dcce5eb5628ccfa89c2abbd63c36f3f))
+* **keytracker:** adjust interfaces for keytracker ([6aa3d34](https://github.com/joshuar/autocorrector/commit/6aa3d3416ec94eb560d43b808a26fca0dfbc49c5))
+* **keytracker:** improve goroutine handling ([c6177d6](https://github.com/joshuar/autocorrector/commit/c6177d6024e6ed5a309856625a76123a478f827f))
+* **tools/scraper:** add a tool to scrape common misspellings off Wikipedia ([9b412ec](https://github.com/joshuar/autocorrector/commit/9b412ecf49b009360e93012ea4ead957835b533e))
+* **tools:** scraper output saves as corrections.toml ([ff32e41](https://github.com/joshuar/autocorrector/commit/ff32e41db1b4596ca9fca71ee9cac1f5b1d17817))
+
+
+### Bug Fixes
+
+* **app:** quit from tray icon runs appropriate actions ([6681999](https://github.com/joshuar/autocorrector/commit/66819995b8d737740ef7f5ab9ea0027d5f4c3df6))
+* **corrections:** remove spew ([a6a96fd](https://github.com/joshuar/autocorrector/commit/a6a96fdebd529c02d4b36116afc3560278929c12))
+
 ## [2.1.1](https://github.com/joshuar/autocorrector/compare/v2.1.0...v2.1.1) (2023-08-26)
 
 
