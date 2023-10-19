@@ -52,17 +52,12 @@ type KeyTracker struct {
 
 func (kt *KeyTracker) slurpWords(wordCh chan *Correction, stats stats) {
 	charBuf := new(bytes.Buffer)
-	patternBuf := newPatternBuf(3)
 	log.Debug().Msg("Slurping words...")
 	for k := range kt.kbdEvents {
 		if kt.paused {
 			continue
 		}
 		if k.IsKeyRelease() {
-			patternBuf.write(k.AsRune)
-			if patternBuf.match(".  ") {
-				kt.kbd.TypeBackspace()
-			}
 			switch {
 			case k.IsBackspace():
 				// backspace key
@@ -71,22 +66,23 @@ func (kt *KeyTracker) slurpWords(wordCh chan *Correction, stats stats) {
 					charBuf.Truncate(charBuf.Len() - 1)
 				}
 			case k.AsRune == '\n' || unicode.IsControl(k.AsRune):
+				stats.IncKeyCounter()
 				// newline or control character, reset the buffer
 				charBuf.Reset()
 			case unicode.IsPunct(k.AsRune), unicode.IsSymbol(k.AsRune), unicode.IsSpace(k.AsRune):
+				stats.IncKeyCounter()
 				// a punctuation mark, which would indicate a word has been typed, so handle that
 				//
 				// most other punctuation should indicate end of word, so
 				// handle that
-				stats.IncKeyCounter()
 				if charBuf.Len() > 0 {
 					wordCh <- NewCorrection(charBuf.String(), "", k.AsRune)
 					charBuf.Reset()
 				}
 			default:
+				stats.IncKeyCounter()
 				// case unicode.IsDigit(k.AsRune), unicode.IsLetter(k.AsRune):
 				// a letter or number
-				stats.IncKeyCounter()
 				_, err := charBuf.WriteRune(k.AsRune)
 				if err != nil {
 					log.Debug().Caller().Err(err).
