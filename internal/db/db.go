@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -51,7 +52,7 @@ func (c *Counters) Accuracy() float64 {
 	return (1 - float64(c.WordsCorrected.Get())/float64(c.WordsChecked.Get())) * 100
 }
 
-func (c *Counters) Write(file string) error {
+func (c *Counters) write(file string) error {
 	fs, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0640)
 	if err != nil {
 		return err
@@ -129,8 +130,21 @@ func (s *Stats) GetEfficiency() float64 {
 }
 
 func (s *Stats) Save() {
-	if err := s.counters.Write(s.countersFile); err != nil {
+	if err := s.counters.write(s.countersFile); err != nil {
 		log.Warn().Err(err).Msg("Error saving stats.")
+	}
+}
+
+func (s *Stats) runSync() {
+	ticker := time.NewTicker(1 * time.Hour)
+	done := make(chan bool)
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			s.counters.write(s.countersFile)
+		}
 	}
 }
 
@@ -144,5 +158,6 @@ func RunStats(ctx context.Context, path string) (*Stats, error) {
 		return nil, errors.Join(errors.New("could not open counters file"), err)
 	}
 	s.counters = c
+	go s.runSync()
 	return s, nil
 }
