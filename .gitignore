@@ -16,6 +16,7 @@
 !docs/**/*.png
 !tools/*
 !internal/**/*.png
+!cosign.*
 # ...even if they are in subdirectories
 !*/
 
