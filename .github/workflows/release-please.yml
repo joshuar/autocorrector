@@ -45,6 +45,10 @@ jobs:
         shell: sh
         run: cd internal/app && printf %s $(git tag | tail -1) > VERSION
 
+      - name: install cosign
+        id: install_cosign
+        uses: sigstore/cosign-installer@v3.1.1
+
       - uses: goreleaser/goreleaser-action@v4
         if: ${{ steps.release_please.outputs.release_created }}
         name: Run Go Releaser
