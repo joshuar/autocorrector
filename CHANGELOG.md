@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.0](https://github.com/joshuar/autocorrector/compare/v3.0.1...v3.1.0) (2023-10-22)
+
+
+### Features
+
+* **db:** sync database to disk every hour ([c06af4e](https://github.com/joshuar/autocorrector/commit/c06af4eb3356d33ca14cd2270a53ab9e814329e9))
+
+
+### Bug Fixes
+
+* **keytracker:** remove non-working pattern matching code ([e495f1b](https://github.com/joshuar/autocorrector/commit/e495f1b7932273f2b9f8557eee121267898d238c))
+
 ## [3.0.1](https://github.com/joshuar/autocorrector/compare/v3.0.0...v3.0.1) (2023-10-18)
 
 
