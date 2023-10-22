@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.3](https://github.com/joshuar/autocorrector/compare/v3.1.2...v3.1.3) (2023-10-22)
+
+
+### Bug Fixes
+
+* specify cosign version ([f178ea2](https://github.com/joshuar/autocorrector/commit/f178ea275c1a194ae8c289a6ef3eac7c33802e98))
+
 ## [3.1.2](https://github.com/joshuar/autocorrector/compare/v3.1.1...v3.1.2) (2023-10-22)
 
 
