@@ -22,10 +22,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-//go:embed assets/urls/issueURL
+//go:embed assets/urls/issueURL.txt
 var issueURL string
 
-//go:embed assets/urls/featureRequestURL
+//go:embed assets/urls/featureRequestURL.txt
 var featureRequestURL string
 
 func newUI() fyne.App {

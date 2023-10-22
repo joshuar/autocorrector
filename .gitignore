@@ -9,6 +9,7 @@
 !*.yml
 !*.yaml
 !*.md
+!*.txt
 !go.sum
 !go.mod
 !assets/
