@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.2](https://github.com/joshuar/autocorrector/compare/v3.1.1...v3.1.2) (2023-10-22)
+
+
+### Bug Fixes
+
+* install cosign in actions ([ac7ef25](https://github.com/joshuar/autocorrector/commit/ac7ef25bbc1c131583807056c2d5494e05be8df7))
+
 ## [3.1.1](https://github.com/joshuar/autocorrector/compare/v3.1.0...v3.1.1) (2023-10-22)
 
 
