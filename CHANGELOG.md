@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1](https://github.com/joshuar/autocorrector/compare/v3.1.0...v3.1.1) (2023-10-22)
+
+
+### Bug Fixes
+
+* **ui:** commit URL txt files ([eb07d91](https://github.com/joshuar/autocorrector/commit/eb07d915ce4e79cad6d0f1d0383d8d174e2f516c))
+
 ## [3.1.0](https://github.com/joshuar/autocorrector/compare/v3.0.1...v3.1.0) (2023-10-22)
 
 
