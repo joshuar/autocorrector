@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.4](https://github.com/joshuar/autocorrector/compare/v3.1.3...v3.1.4) (2023-10-24)
+
+
+### Bug Fixes
+
+* **app,db,keytracker:** better handling of app shutdown ([719ae12](https://github.com/joshuar/autocorrector/commit/719ae127ceb3536c54fd20a6803b5ee294114f6c))
+* **app:** shutdown works correctly from tray menu ([2eff060](https://github.com/joshuar/autocorrector/commit/2eff060f722814d2cd288b283dfec16c47eef2c3))
+
 ## [3.1.3](https://github.com/joshuar/autocorrector/compare/v3.1.2...v3.1.3) (2023-10-22)
 
 
