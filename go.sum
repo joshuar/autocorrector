@@ -234,6 +234,8 @@ github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLf
 github.com/jawher/mow.cli v1.1.0/go.mod h1:aNaQlc7ozF3vw6IJ2dHjp2ZFiA4ozMIYY6PyuRJwlUg=
 github.com/joshuar/gokbd v0.3.0 h1:+zWrgK43oEiygK9gziYd75/61+vtbtKNPgT72CUa5dQ=
 github.com/joshuar/gokbd v0.3.0/go.mod h1:LUpDgUpkQenDHydRnOAHibp/Hex6Fdwdg73Zb2JiUqY=
+github.com/joshuar/gokbd v0.3.1 h1:cmqMP0JqmK611P0bsyHsYCdUrWx77rpB23rK6OkQa4Y=
+github.com/joshuar/gokbd v0.3.1/go.mod h1:LUpDgUpkQenDHydRnOAHibp/Hex6Fdwdg73Zb2JiUqY=
 github.com/json-iterator/go v1.1.11/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
 github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1:6v2b51hI/fHJwM22ozAgKL4VKDeJcHhJFhtBdhmNjmU=
 github.com/jstemmer/go-junit-report v0.9.1/go.mod h1:Brl9GWCQeLvo8nXZwPNNblvFj/XSXhF0NWZEnDohbsk=

@@ -3,13 +3,12 @@ module github.com/joshuar/autocorrector
 go 1.20
 
 require (
-	github.com/joshuar/gokbd v0.3.0
+	github.com/joshuar/gokbd v0.3.1
 	github.com/magefile/mage v1.15.0
 	github.com/spf13/cobra v1.7.0
 )
 
-replace github.com/joshuar/gokbd v0.3.0 => ../gokbd
-
+// replace github.com/joshuar/gokbd v0.3.0 => ../gokbd
 
 require (
 	fyne.io/systray v1.10.1-0.20230722100817-88df1e0ffa9a // indirect

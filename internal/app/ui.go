@@ -16,7 +16,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/joshuar/autocorrector/internal/db"
 	"github.com/rs/zerolog/log"
@@ -29,15 +28,8 @@ var issueURL string
 var featureRequestURL string
 
 func newUI() fyne.App {
-	var a fyne.App
-	if debugAppID != "" {
-		a = app.NewWithID(debugAppID)
-		a.SetIcon(theme.FyneLogo())
-
-	} else {
-		a = app.NewWithID(fyneAppID)
-		a.SetIcon(trayIcon{})
-	}
+	a := app.NewWithID(fyneAppID)
+	a.SetIcon(trayIcon{})
 	return a
 }
 
@@ -46,6 +38,7 @@ func (a *App) setupSystemTray(stats *db.Stats) {
 	a.tray.SetMaster()
 	if desk, ok := a.app.(desktop.App); ok {
 		menuItemQuit := fyne.NewMenuItem("Quit", func() {
+			a.app.Quit()
 			close(a.Done)
 		})
 		menuItemQuit.IsQuit = true
