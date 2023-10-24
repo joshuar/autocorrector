@@ -37,7 +37,6 @@ following for the `rpm` package can be used:
 cosign verify-blob --key cosign.pub --signature autocorrector-*.rpm.sig autocorrector-*.rpm
 ```
 
-
 ## 📝 Configuration and additional details
 
 See [USAGE](USAGE.md)
