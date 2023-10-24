@@ -46,7 +46,7 @@ func (a *App) setupSystemTray(stats *db.Stats) {
 	a.tray.SetMaster()
 	if desk, ok := a.app.(desktop.App); ok {
 		menuItemQuit := fyne.NewMenuItem("Quit", func() {
-			a.Stop()
+			close(a.Done)
 		})
 		menuItemQuit.IsQuit = true
 		menuItemAbout := fyne.

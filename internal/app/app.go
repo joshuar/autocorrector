@@ -68,18 +68,17 @@ func New() *App {
 
 func (a *App) Run() {
 	var wg sync.WaitGroup
-	appCtx, cancelfunc := context.WithCancel(context.Background())
+	ctx, cancelFunc := context.WithCancel(context.Background())
 	if err := createDir(configPath); err != nil {
 		log.Fatal().Err(err).Msg("Could not create config directory.")
 	}
 
-	stats, err := db.RunStats(appCtx, configPath)
-	defer close(stats.Done)
+	stats, err := db.RunStats(ctx, configPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to start stats tracking.")
 	}
 
-	keyTracker, err := keytracker.NewKeyTracker(a, stats)
+	keyTracker, err := keytracker.NewKeyTracker(ctx, a, stats)
 	defer close(keyTracker.ToggleCh)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Could not start keytracker.")
@@ -87,9 +86,11 @@ func (a *App) Run() {
 
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			select {
-			case <-appCtx.Done():
+			case <-a.Done:
+				cancelFunc()
 				return
 			case n := <-a.notificationsCh:
 				if a.showNotifications {
@@ -107,30 +108,12 @@ func (a *App) Run() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
+		defer close(a.Done)
 		<-c
-		log.Debug().Msg("Ctrl-C pressed.")
-		close(a.Done)
-	}()
-	go func() {
-		<-a.Done
-		stats.Save()
-		log.Debug().Msg("Agent done.")
-		os.Exit(0)
-	}()
-	go func() {
-		<-appCtx.Done()
-		log.Debug().Msg("Context canceled.")
-		os.Exit(1)
 	}()
 
 	a.setupSystemTray(stats)
 	a.app.Run()
-	wg.Wait()
-	cancelfunc()
-}
-
-func (a *App) Stop() {
-	close(a.Done)
 }
 
 func createDir(path string) error {

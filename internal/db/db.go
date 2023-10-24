@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -135,12 +136,12 @@ func (s *Stats) Save() {
 	}
 }
 
-func (s *Stats) runSync() {
+func (s *Stats) runSync(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Hour)
-	done := make(chan bool)
 	for {
 		select {
-		case <-done:
+		case <-s.Done:
+			s.counters.write(s.countersFile)
 			return
 		case <-ticker.C:
 			s.counters.write(s.countersFile)
@@ -158,6 +159,16 @@ func RunStats(ctx context.Context, path string) (*Stats, error) {
 		return nil, errors.Join(errors.New("could not open counters file"), err)
 	}
 	s.counters = c
-	go s.runSync()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.runSync(ctx)
+	}()
+	go func() {
+		<-ctx.Done()
+		close(s.Done)
+		wg.Wait()
+	}()
 	return s, nil
 }
